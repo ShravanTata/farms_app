@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "farms_app"
+version = "0.0.1.dev0"
+license = {file = "LICENSE.txt"}
+description = "Fundamental algorithms for scientific computing in Python"
+maintainers = [
+    { name = "Farmers", email = "biorob-farms@groupes.epfl.ch" },
+]
+
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "imgui_bundle",
+    "pywavefront",
+    "matplotlib",
+    "tqdm",
+    "pyyaml",
+] # keep in sync with `min_numpy_version` in meson.build
+
+readme = "README.md"
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: C",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific visualization",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Operating System :: MacOS",
+]
