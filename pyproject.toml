@@ -6,24 +6,24 @@ build-backend = "setuptools.build_meta"
 name = "farms_app"
 version = "0.0.1.dev0"
 license = {file = "LICENSE.txt"}
-description = "Fundamental algorithms for scientific computing in Python"
+description = "GUI Application for neuromechanical simulations using FARMS"
 maintainers = [
-    { name = "Farmers", email = "biorob-farms@groupes.epfl.ch" },
+    {name="Farmers", email="biorob-farms@groupes.epfl.ch"},
 ]
-
 requires-python = ">=3.10"
 dependencies = [
-    "numpy",
-    "scipy",
+    "numpy <= 1.26.4",
     "imgui_bundle",
-    "pywavefront",
-    "matplotlib",
     "tqdm",
     "pyyaml",
+    "rich",
+    "h5py",
+    "farms_core @ git+https://github.com/farmsim/farms_core.git",
 ] # keep in sync with `min_numpy_version` in meson.build
 
 readme = "README.md"
 classifiers = [
+    "Development Status :: 3 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
@@ -43,3 +43,13 @@ classifiers = [
     "Operating System :: Unix",
     "Operating System :: MacOS",
 ]
+
+[project.urls]
+Homepage = "https://farmsim.dev"
+Documentation = "https://farmsim.dev"
+Repository = "https://github.com/farmsim/farms_app.git"
+Issues = "https://github.com/farmsim/farms_app/issues"
+Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+full = []
