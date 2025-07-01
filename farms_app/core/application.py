@@ -12,9 +12,9 @@ from farms_app.backends.manager import BackendManager
 from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.plugins.base import BasePlugin
 from farms_app.plugins.defaults.simulation import ParameterEditorPlugin
-from farms_app.plugins.defaults.logger import LoggerPlugin
+# from farms_app.plugins.defaults.logger import LoggerPlugin
 from farms_app.plugins.defaults.mujoco_impl import MuJoCoPlugin
-from farms_app.plugins.defaults.network import NetworkPlugin
+# from farms_app.plugins.defaults.network import NetworkPlugin
 import glfw
 
 
