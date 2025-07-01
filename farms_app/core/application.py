@@ -3,7 +3,7 @@ Main script to run the FARMS app
 """
 
 from typing import List
-from farms_app.core.options import ApplicationOptions
+# from farms_app.core.options import ApplicationOptions
 import numpy as np
 from imgui_bundle import imgui, imgui_ctx, implot
 
@@ -38,7 +38,7 @@ class FARMSApplication:
         self.plugins.append(NetworkPlugin())
 
     @classmethod
-    def from_options(cls, options: ApplicationOptions):
+    def from_options(cls, options):
         """ Initialize using options """
         ...
 
