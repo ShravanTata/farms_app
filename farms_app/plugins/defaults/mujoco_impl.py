@@ -4,6 +4,7 @@
 import ctypes
 
 import mujoco
+import numpy as np
 import OpenGL.GL as GL  # type: ignore
 from farms_core import pylog
 from imgui_bundle import imgui
@@ -129,7 +130,9 @@ class MuJoCoPlugin(BasePlugin):
         self.camera = mujoco.MjvCamera()
         self.option = mujoco.MjvOption()
         self.option.flags[mujoco.mjtVisFlag.mjVIS_LIGHT] = True
-        model.vis.headlight.ambient = [0.8, 0.8, 0.8]
+        model.vis.headlight.ambient[:] = [0.4]*3
+        model.vis.headlight.diffuse[:] = [0.4]*3
+        model.vis.headlight.specular[:] = [0.5]*3
         self.perturb = mujoco.MjvPerturb()
         mujoco.mjv_defaultCamera(self.camera)
         mujoco.mjv_defaultPerturb(self.perturb)
@@ -138,14 +141,24 @@ class MuJoCoPlugin(BasePlugin):
         self.scene = mujoco.MjvScene(model, maxgeom=10000)
 
         self.viewport = mujoco.MjrRect(0, 0, 0, 0)
-        self.viewport.width, self.viewport.height = 400,300
+        self.width, self.height = 1280, 720
+        self.max_width, self.max_height = 1920, 1080
+        self.viewport.width, self.viewport.height = self.width, self.height
+        self.framebuffer = None
+        self.depth_buffer = None
+        self.texture_id = None
+        self.create_framebuffer(self.width, self.height)
 
+    def get_name(self) -> str:
+        return "MuJoCo"
+
+    def create_framebuffer(self, width: int, height: int):
+        """ Create Framebuffer """
         self.texture_id = GL.glGenTextures(1)
-        width, height = 400, 300
 
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.texture_id)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGB, width, height, 0,
-                        GL.GL_RGB, GL.GL_UNSIGNED_BYTE, None)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_SRGB_ALPHA, width, height, 0,
+                        GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
         # Set texture parameters
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
@@ -156,7 +169,6 @@ class MuJoCoPlugin(BasePlugin):
         self.framebuffer = GL.glGenFramebuffers(1)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
 
-
         # Attach texture to framebuffer
         GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
                                   GL.GL_TEXTURE_2D, self.texture_id, 0)
@@ -165,7 +177,7 @@ class MuJoCoPlugin(BasePlugin):
         self.depth_buffer = GL.glGenRenderbuffers(1)
         GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self.depth_buffer)
         GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_DEPTH_COMPONENT24,
-                                 400, 300)
+                                 self.width, self.height)
         GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT,
                                     GL.GL_RENDERBUFFER, self.depth_buffer)
 
@@ -173,27 +185,33 @@ class MuJoCoPlugin(BasePlugin):
         if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
             print("Framebuffer not complete!")
 
+        GL.glEnable(GL.GL_MULTISAMPLE)
+
         # Unbind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
-    def get_name(self) -> str:
-        return "MuJoCo"
+    def resize_framebuffer(self):
+        """ Resize framebuffer """
 
     def render(self) -> None:
         if not self.show_window:
             return
 
+        _io = imgui.get_io()
+        mouse_pos = _io.mouse_pos
+        mouse_delta = _io.mouse_delta
+
         mujoco.mj_step(model, data)
 
         # Bind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
-        GL.glViewport(0, 0, 400, 300)
+        GL.glViewport(0, 0, self.width, self.height)
 
         # Minimal OpenGL setup - let MuJoCo handle lighting
-        GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glClearColor(0.9, 0.9, 0.9, 1.0)  # Light gray background
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+        # GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
+        GL.glClearColor(0.1, 0.1, 0.1, 1.0)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         # Update and render
         mujoco.mjv_updateScene(model, data, self.option, None, self.camera,
@@ -203,9 +221,55 @@ class MuJoCoPlugin(BasePlugin):
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
         expanded, self.show_window = imgui.begin("Example: image display", self.show_window)
+        available_size = imgui.get_content_region_avail()
+
+        if imgui.is_window_hovered():
+            if imgui.is_key_down(imgui.Key.mouse_left):
+                mujoco.mjv_moveCamera(
+                    model,
+                    mujoco.mjtMouse.mjMOUSE_ROTATE_H,
+                    -mouse_delta.x / self.width,
+                    0.0,
+                    self.scene,
+                    self.camera,
+                )
+                mujoco.mjv_moveCamera(
+                    model,
+                    mujoco.mjtMouse.mjMOUSE_ROTATE_V,
+                    0.0,
+                    mouse_delta.y / self.height,
+                    self.scene,
+                    self.camera,
+                )
+            elif imgui.is_key_down(imgui.Key.mouse_right):
+                mujoco.mjv_moveCamera(
+                    model,
+                    mujoco.mjtMouse.mjMOUSE_MOVE_H,
+                    -mouse_delta.x / self.width,
+                    0.0,
+                    self.scene,
+                    self.camera,
+                )
+                mujoco.mjv_moveCamera(
+                    model,
+                    mujoco.mjtMouse.mjMOUSE_MOVE_V,
+                    0.0,
+                    mouse_delta.y / self.height,
+                    self.scene,
+                    self.camera,
+                )
+            elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
+                mujoco.mjv_moveCamera(
+                    model,
+                    mujoco.mjtMouse.mjMOUSE_ZOOM,
+                    0.0,
+                    np.sign(_io.mouse_wheel)*0.05*1,
+                    self.scene,
+                    self.camera,
+                )
         imgui.image(
             int(self.texture_id),
-            imgui.ImVec2((400, 300)),
+            imgui.ImVec2((self.width, self.height)),
             uv0=imgui.ImVec2((1,1)),
             uv1=imgui.ImVec2((0,0)),
             # border_color=imgui.ImVec4((1, 0, 0, 1))
