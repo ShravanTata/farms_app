@@ -190,8 +190,19 @@ class MuJoCoPlugin(BasePlugin):
         # Unbind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
-    def resize_framebuffer(self):
-        """ Resize framebuffer """
+    def resize_framebuffer(self, width, height):
+        self.width = width
+        self.height = height
+
+        # Delete old OpenGL resources
+        GL.glDeleteTextures([self.texture_id])
+        GL.glDeleteRenderbuffers(1, [self.depth_buffer])
+        GL.glDeleteFramebuffers(1, [self.framebuffer])
+
+        # Recreate them with new size
+        self.viewport.width, self.viewport.height = width, height
+
+        self.create_framebuffer(self.width, self.height)
 
     def render(self) -> None:
         if not self.show_window:
@@ -221,7 +232,6 @@ class MuJoCoPlugin(BasePlugin):
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
         expanded, self.show_window = imgui.begin("Example: image display", self.show_window)
-        available_size = imgui.get_content_region_avail()
 
         if imgui.is_window_hovered():
             if imgui.is_key_down(imgui.Key.mouse_left):
@@ -267,9 +277,26 @@ class MuJoCoPlugin(BasePlugin):
                     self.scene,
                     self.camera,
                 )
+
+        target_aspect = self.width / self.height
+        avail_width, avail_height = imgui.get_content_region_avail()
+        if avail_width <= 0 or avail_height <= 0:
+            # Skip rendering this frame or use fallback size
+            imgui.end()
+            return
+        current_aspect = avail_width / avail_height
+        if current_aspect > target_aspect:
+            # Window is too wide → limit width
+            draw_height = avail_height
+            draw_width = target_aspect * draw_height
+        else:
+            # Window is too tall → limit height
+            draw_width = avail_width
+            draw_height = draw_width / target_aspect
+
         imgui.image(
             int(self.texture_id),
-            imgui.ImVec2((self.width, self.height)),
+           imgui.ImVec2((draw_width, draw_height)),
             uv0=imgui.ImVec2((1,1)),
             uv1=imgui.ImVec2((0,0)),
             # border_color=imgui.ImVec4((1, 0, 0, 1))
