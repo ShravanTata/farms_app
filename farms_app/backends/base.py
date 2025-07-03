@@ -38,8 +38,14 @@ class BaseBackend(ABC):
     @abstractmethod
     def draw(self, data: imgui.ImDrawData):
         """ valid after Render() and until the next call to NewFrame(). this is what you have to render. """
+        pass
 
     @abstractmethod
     def should_close(self) -> bool:
         """Check if window should close"""
         pass
+
+    @abstractmethod
+    def poll_events(self):
+         """Poll events"""
+         pass

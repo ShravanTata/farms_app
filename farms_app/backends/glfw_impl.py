@@ -7,11 +7,12 @@ from enum import Enum
 from typing import Tuple, Any
 import ctypes
 
+import glfw
+import OpenGL.GL as GL
+
 from .base import BaseBackend
 from farms_core import pylog
-from imgui_bundle import imgui, implot
-import OpenGL.GL as GL
-import glfw
+from imgui_bundle import imgui
 
 
 class OpenGLVersion(Enum):
@@ -98,7 +99,7 @@ class GLFWBackend(BaseBackend):
     def _setup_imgui(self):
         """Setup ImGui context and backends"""
         imgui.create_context()
-        _ = implot.create_context()
+        # _ = implot.create_context()
         io = imgui.get_io()
 
         # Configure ImGui
@@ -172,6 +173,7 @@ class GLFWBackend(BaseBackend):
             imgui.backends.opengl2_new_frame()
         imgui.backends.glfw_new_frame()
         imgui.new_frame()
+        imgui.dock_space_over_viewport()
 
     def end_frame(self):
         """End frame rendering"""
@@ -208,6 +210,10 @@ class GLFWBackend(BaseBackend):
     def should_close(self) -> bool:
         """Check if window should close"""
         return glfw.window_should_close(self.window) if self.window else True
+
+    def poll_events(self):
+        """ Poll GLFW events """
+        glfw.poll_events()
 
     @staticmethod
     def _glfw_error_callback(error: int, description: str) -> None:

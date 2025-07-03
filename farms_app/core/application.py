@@ -5,9 +5,7 @@ Main script to run the FARMS app
 from typing import List
 # from farms_app.core.options import ApplicationOptions
 import numpy as np
-from imgui_bundle import imgui, imgui_ctx, implot
 
-import OpenGL.GL as GL  # type: ignore
 from farms_app.backends.manager import BackendManager
 from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.plugins.base import BasePlugin
@@ -15,7 +13,8 @@ from farms_app.plugins.defaults.simulation import ParameterEditorPlugin
 # from farms_app.plugins.defaults.logger import LoggerPlugin
 from farms_app.plugins.defaults.mujoco_impl import MuJoCoPlugin
 # from farms_app.plugins.defaults.network import NetworkPlugin
-import glfw
+from imgui_bundle import imgui
+
 
 
 class FARMSApplication:
@@ -64,14 +63,15 @@ class FARMSApplication:
     def run(self):
         """main run method"""
 
-        while not glfw.window_should_close(self._window):
-            glfw.poll_events()
+        while not self.backend.should_close():
+            # Poll events
+            self.backend.poll_events()
 
             # Start the Dear ImGui frame
             self.backend.begin_frame()
 
             self.render_menu()
-            imgui.dock_space_over_viewport()
+
             self.render_plugins()
 
             self.backend.end_frame()
