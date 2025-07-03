@@ -104,22 +104,24 @@ class GLFWBackend(BaseBackend):
         # Configure ImGui
         io.config_flags |= imgui.ConfigFlags_.nav_enable_keyboard.value
         io.config_flags |= imgui.ConfigFlags_.docking_enable.value
-        io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
-        io.config_viewports_no_auto_merge = False
-        io.config_viewports_no_task_bar_icon = True
+        if platform.system() != "Linux":
+            io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
+            io.config_viewports_no_auto_merge = False
+            io.config_viewports_no_task_bar_icon = True
 
         # Setup style
         imgui.style_colors_dark()
 
         # Viewport style adjustments
         style = imgui.get_style()
-        if io.config_flags & imgui.ConfigFlags_.viewports_enable.value:
-            style.window_rounding = 0.0
-            window_bg_color = style.color_(imgui.Col_.window_bg.value)
-            window_bg_color.w = 1.0
-            style.set_color_(imgui.Col_.window_bg.value, window_bg_color)
+        if platform.system() != "Linux":
+            if io.config_flags & imgui.ConfigFlags_.viewports_enable.value:
+                style.window_rounding = 0.0
+                window_bg_color = style.color_(imgui.Col_.window_bg.value)
+                window_bg_color.w = 1.0
+                style.set_color_(imgui.Col_.window_bg.value, window_bg_color)
 
-        # Setup backends
+        # setup backends
         window_address = ctypes.cast(self.window, ctypes.c_void_p).value
         imgui.backends.glfw_init_for_opengl(window_address, True)
 
@@ -187,11 +189,12 @@ class GLFWBackend(BaseBackend):
             imgui.backends.opengl2_render_draw_data(imgui.get_draw_data())
 
         # Multi-viewport support
-        if io.config_flags & imgui.ConfigFlags_.viewports_enable.value:
-            backup_current_context = glfw.get_current_context()
-            imgui.update_platform_windows()
-            imgui.render_platform_windows_default()
-            glfw.make_context_current(backup_current_context)
+        if platform.system() != "Linux":
+            if io.config_flags & imgui.ConfigFlags_.viewports_enable.value:
+                backup_current_context = glfw.get_current_context()
+                imgui.update_platform_windows()
+                imgui.render_platform_windows_default()
+                glfw.make_context_current(backup_current_context)
 
         glfw.swap_buffers(self.window)
 
