@@ -7,13 +7,25 @@ from enum import Enum
 from typing import Tuple, Any
 import ctypes
 
-# Important to import GL before imgui for cross-platform support of GL2
-import glfw
-import OpenGL.GL as GL
-
 from .base import BaseBackend
 from farms_core import pylog
-from imgui_bundle import imgui
+
+
+if platform.system() == "Darwin":
+    from imgui_bundle import imgui
+    # Important to import GL and glfw after imgui for cross-platform support of GL2
+    import OpenGL.GL as GL
+    import glfw
+elif platform.system() == "Linux":
+    # Important to import GL before imgui for cross-platform support of GL2
+    import OpenGL.GL as GL
+    import glfw
+    from imgui_bundle import imgui
+else:
+    # Important to import GL before imgui for cross-platform support of GL2
+    import OpenGL.GL as GL
+    import glfw
+    from imgui_bundle import imgui
 
 
 class OpenGLVersion(Enum):
