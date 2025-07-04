@@ -1,10 +1,9 @@
 """ Base interface for backend """
+# DO NOT IMPORT IMGUI here! Breaks cross-platform support for GL2 :(
 
 
 from abc import ABC, abstractmethod
 from typing import Any
-
-from imgui_bundle import imgui
 
 
 class BackendError(Exception):
@@ -36,7 +35,7 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def draw(self, data: imgui.ImDrawData):
+    def draw(self, data: "imgui.ImDrawData"):
         """ valid after Render() and until the next call to NewFrame(). this is what you have to render. """
         pass
 

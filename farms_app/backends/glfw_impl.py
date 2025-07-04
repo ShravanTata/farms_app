@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Tuple, Any
 import ctypes
 
+# Important to import GL before imgui for cross-platform support of GL2
 import glfw
 import OpenGL.GL as GL
 
@@ -18,7 +19,6 @@ from imgui_bundle import imgui
 class OpenGLVersion(Enum):
     GL2 = "2"
     GL3 = "3"
-    AUTO = "auto"
 
 
 class GLFWBackend(BaseBackend):
@@ -36,8 +36,9 @@ class GLFWBackend(BaseBackend):
             return self._get_gl2_config()
         elif self.gl_version == OpenGLVersion.GL3:
             return self._get_gl3_config()
-        else:  # AUTO
-            return self._get_auto_config()
+        else:
+            pylog.error(f"Unsupported GL Version {self.gl_version}")
+            raise AttributeError
 
     def _get_gl2_config(self) -> Tuple[int, int, str]:
         """OpenGL 2.1 configuration"""
@@ -49,18 +50,6 @@ class GLFWBackend(BaseBackend):
             return (3, 2, "#version 150")
         else:
             return (3, 0, "#version 130")
-
-    def _get_auto_config(self) -> Tuple[int, int, str]:
-        """Auto-detect best OpenGL version"""
-        if platform.system() == "Darwin":
-            # macOS: Try GL3 first, fallback to GL2
-            try:
-                return self._get_gl3_config()
-            except:
-                return self._get_gl2_config()
-        else:
-            # Linux/Windows: Try GL3 first
-            return self._get_gl3_config()
 
     def _setup_glfw_hints(self, major: int, minor: int):
         """Setup GLFW context hints"""
