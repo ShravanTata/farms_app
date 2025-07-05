@@ -121,16 +121,48 @@ model = mujoco.MjModel.from_xml_string(
 data = mujoco.MjData(model)
 
 
+MJ_IMGUI_KEYMAP = {
+    # special keys
+    "/": imgui.Key.slash,
+    "\\": imgui.Key.backslash,
+    ",": imgui.Key.comma,
+    ".": imgui.Key.period,
+    ";": imgui.Key.semicolon,
+    "'": imgui.Key.apostrophe,
+    "[": imgui.Key.left_bracket,
+    "]": imgui.Key.right_bracket,
+    "-": imgui.Key.minus,
+    "=": imgui.Key.equal,
+    "`": imgui.Key.grave_accent,
+    # letters A–Z
+    **{chr(c): getattr(imgui.Key, chr(c).lower()) for c in range(ord("A"), ord("Z")+1)},
+    **{str(i): getattr(imgui.Key, f"_{i}") for i in range(6)},
+}
+
+
+_mjGEOMSTRING = (
+    (
+        "Geom1", "1", "0",
+        "Geom2", "1", "1",
+        "Geom3", "1", "2",
+        "Geom4", "0", "3",
+        "Geom5", "0", "4",
+        "Geom6", "0", "5",
+    ),
+)
+
+
 class MuJoCoPlugin(BasePlugin):
     """ MuJoCo """
 
     def __init__(self):
         self.show_window = True
+        self._io = imgui.get_io()
 
         self.camera = mujoco.MjvCamera()
         self.option = mujoco.MjvOption()
         self.option.flags[mujoco.mjtVisFlag.mjVIS_LIGHT] = True
-        model.vis.headlight.ambient[:] = [0.4]*3
+        model.vis.headlight.ambient[:] = [0.6]*3
         model.vis.headlight.diffuse[:] = [0.4]*3
         model.vis.headlight.specular[:] = [0.5]*3
         self.perturb = mujoco.MjvPerturb()
@@ -183,7 +215,7 @@ class MuJoCoPlugin(BasePlugin):
 
         # Check framebuffer completeness
         if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
-            print("Framebuffer not complete!")
+            pylog.error("Framebuffer not complete!")
 
         GL.glEnable(GL.GL_MULTISAMPLE)
 
@@ -208,9 +240,8 @@ class MuJoCoPlugin(BasePlugin):
         if not self.show_window:
             return
 
-        _io = imgui.get_io()
-        mouse_pos = _io.mouse_pos
-        mouse_delta = _io.mouse_delta
+        # self.scene.flags[0] = 0
+        # self.scene.flags[2] = 0
 
         mujoco.mj_step(model, data)
 
@@ -234,49 +265,8 @@ class MuJoCoPlugin(BasePlugin):
         expanded, self.show_window = imgui.begin("Example: image display", self.show_window)
 
         if imgui.is_window_hovered():
-            if imgui.is_key_down(imgui.Key.mouse_left):
-                mujoco.mjv_moveCamera(
-                    model,
-                    mujoco.mjtMouse.mjMOUSE_ROTATE_H,
-                    -mouse_delta.x / self.width,
-                    0.0,
-                    self.scene,
-                    self.camera,
-                )
-                mujoco.mjv_moveCamera(
-                    model,
-                    mujoco.mjtMouse.mjMOUSE_ROTATE_V,
-                    0.0,
-                    mouse_delta.y / self.height,
-                    self.scene,
-                    self.camera,
-                )
-            elif imgui.is_key_down(imgui.Key.mouse_right):
-                mujoco.mjv_moveCamera(
-                    model,
-                    mujoco.mjtMouse.mjMOUSE_MOVE_H,
-                    -mouse_delta.x / self.width,
-                    0.0,
-                    self.scene,
-                    self.camera,
-                )
-                mujoco.mjv_moveCamera(
-                    model,
-                    mujoco.mjtMouse.mjMOUSE_MOVE_V,
-                    0.0,
-                    mouse_delta.y / self.height,
-                    self.scene,
-                    self.camera,
-                )
-            elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
-                mujoco.mjv_moveCamera(
-                    model,
-                    mujoco.mjtMouse.mjMOUSE_ZOOM,
-                    0.0,
-                    np.sign(_io.mouse_wheel)*0.05*1,
-                    self.scene,
-                    self.camera,
-                )
+            self.mouse_iteractions()
+            self.keyboard_interactions()
 
         target_aspect = self.width / self.height
         avail_width, avail_height = imgui.get_content_region_avail()
@@ -302,3 +292,69 @@ class MuJoCoPlugin(BasePlugin):
             # border_color=imgui.ImVec4((1, 0, 0, 1))
         )
         imgui.end()
+
+    def __mj_keys(self, mjSTRING: tuple[str, str, str], mj_flags):
+        for j, _opt in enumerate(mjSTRING):
+            key_str = _opt[2]
+            if not key_str:
+                continue        # Skip if no key assigned
+            key_enum = MJ_IMGUI_KEYMAP.get(key_str)
+            if key_enum is None:
+                continue
+            if imgui.is_key_pressed(key_enum):
+                mj_flags[j] = not mj_flags[j]
+
+    def keyboard_interactions(self):
+        """ keyboard interactions """
+        self.__mj_keys(mujoco.mjRNDSTRING, self.scene.flags)
+        self.__mj_keys(mujoco.mjVISSTRING, self.option.flags)
+        self.__mj_keys(_mjGEOMSTRING, self.option.geomgroup)
+
+    def mouse_iteractions(self):
+        """ Mouse interactions """
+        mouse_pos = self._io.mouse_pos
+        mouse_delta = self._io.mouse_delta
+        mouse_wheel = self._io.mouse_wheel
+        if imgui.is_key_down(imgui.Key.mouse_left):
+            mujoco.mjv_moveCamera(
+                model,
+                mujoco.mjtMouse.mjMOUSE_ROTATE_H,
+                -mouse_delta.x / self.width,
+                0.0,
+                self.scene,
+                self.camera,
+            )
+            mujoco.mjv_moveCamera(
+                model,
+                mujoco.mjtMouse.mjMOUSE_ROTATE_V,
+                0.0,
+                mouse_delta.y / self.height,
+                self.scene,
+                self.camera,
+            )
+        elif imgui.is_key_down(imgui.Key.mouse_right):
+            mujoco.mjv_moveCamera(
+                model,
+                mujoco.mjtMouse.mjMOUSE_MOVE_H,
+                -mouse_delta.x / self.width,
+                0.0,
+                self.scene,
+                self.camera,
+            )
+            mujoco.mjv_moveCamera(
+                model,
+                mujoco.mjtMouse.mjMOUSE_MOVE_V,
+                0.0,
+                mouse_delta.y / self.height,
+                self.scene,
+                self.camera,
+            )
+        elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
+            mujoco.mjv_moveCamera(
+                model,
+                mujoco.mjtMouse.mjMOUSE_ZOOM,
+                0.0,
+                np.sign(mouse_wheel)*0.05*1,
+                self.scene,
+                self.camera,
+            )
