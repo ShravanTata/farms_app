@@ -12,7 +12,7 @@ from farms_core import pylog
 
 
 if platform.system() == "Darwin":
-    from imgui_bundle import imgui
+    from imgui_bundle import imgui, implot
     # Important to import GL and glfw after imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
@@ -20,12 +20,12 @@ elif platform.system() == "Linux":
     # Important to import GL before imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
-    from imgui_bundle import imgui
+    from imgui_bundle import imgui, implot
 else:
     # Important to import GL before imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
-    from imgui_bundle import imgui
+    from imgui_bundle import imgui, implot
 
 
 class OpenGLVersion(Enum):
@@ -112,7 +112,7 @@ class GLFWBackend(BaseBackend):
     def _setup_imgui(self):
         """Setup ImGui context and backends"""
         imgui.create_context()
-        # _ = implot.create_context()
+        _ = implot.create_context()
         io = imgui.get_io()
 
         # Configure ImGui
@@ -125,6 +125,7 @@ class GLFWBackend(BaseBackend):
 
         # Setup style
         imgui.style_colors_dark()
+        implot.style_colors_dark()
 
         # Viewport style adjustments
         style = imgui.get_style()
