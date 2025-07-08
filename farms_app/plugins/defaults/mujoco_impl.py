@@ -217,7 +217,7 @@ class MuJoCoPlugin(BasePlugin):
         if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
             pylog.error("Framebuffer not complete!")
 
-        GL.glEnable(GL.GL_MULTISAMPLE)
+        # GL.glEnable(GL.GL_MULTISAMPLE)
 
         # Unbind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
