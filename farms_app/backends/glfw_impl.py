@@ -155,6 +155,9 @@ class GLFWBackend(BaseBackend):
             self.window = self._create_window(name, width, height)
             self._setup_imgui()
             self._initialized = True
+            pylog.debug(f"GL_VERSION: {GL.glGetString(GL.GL_VERSION).decode()}")
+            pylog.debug(f"GL_RENDERER: {GL.glGetString(GL.GL_RENDERER).decode()}")
+            pylog.debug(f"GL_VENDOR: {GL.glGetString(GL.GL_VENDOR).decode()}")
             return self.window
         except Exception as e:
             self.cleanup()
