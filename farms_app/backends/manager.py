@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional
 
 from farms_core import pylog
@@ -6,13 +7,24 @@ from .base import BaseBackend
 from .glfw_impl import GLFWBackend
 
 
+class PlatformType(Enum):
+    """ Type of Platform """
+    GLFW = 1
+
+
+class RendererType(Enum):
+    """ Type of Renderer """
+    OPENGL2 = 1
+    OPENGL3 = 2
+
+
 class BackendManager:
     """Manages different backend implementations"""
 
     def __init__(self):
         self.current_backend: Optional[BaseBackend] = None
         self._available_backends = {
-            'glfw': GLFWBackend
+            'glfw': GLFWBackend,
         }
 
     def create_backend(self, backend_type: str = 'glfw', **kwargs) -> BaseBackend:
