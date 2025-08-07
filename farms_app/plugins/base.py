@@ -7,14 +7,14 @@ from abc import ABC, abstractmethod
 from imgui_bundle import imgui
 
 
-class BasePlugin(ABC):
-    """Plugin base class"""
+class BaseWidget(ABC):
+    """Widget base class"""
 
     def __init__(self):
         ""
         super().__init__()
         self.show_window = True
-        self.window_name = "Plugin"
+        self.window_name = "Base Widget"
         self.stage = None
         self.performance_warnings = []
 
@@ -29,7 +29,7 @@ class BasePlugin(ABC):
         if not self.show_window:
             return
 
-        expanded, self.show_window = imgui.begin(
+        expanded, _ = imgui.begin(
             self.window_name, self.show_window, flags=imgui.WindowFlags_.menu_bar
         )
         if expanded:
@@ -42,7 +42,7 @@ class BasePlugin(ABC):
         try:
             self.render()
         except Exception as e:
-            imgui.text_colored((1, 0, 0, 1), f"Plugin Error: {e}")
+            imgui.text_colored((1, 0, 0, 1), f"Widget Error: {e}")
             return
 
         render_time = time.perf_counter() - start_time
@@ -51,7 +51,7 @@ class BasePlugin(ABC):
         if render_time > 0.03:  # 0.03 = 30fps threshold
             warning = f"Slow render: {render_time*1000:.1f}ms"
             self.performance_warnings.append(warning)
-            print(f"⚠️  Plugin '{self.window_name}': {warning}")
+            print(f"⚠️  Widget '{self.window_name}': {warning}")
 
         # Show warnings in GUI
         # self._show_performance_warnings()
@@ -99,7 +99,7 @@ class BasePlugin(ABC):
     #     pass
 
 
-class AppPlugin(BasePlugin):
+class AppWidget(BaseWidget):
     """Full access - internal app components like status bar, menu bar"""
     def __init__(self, app_context):
         super().__init__()
@@ -110,7 +110,7 @@ class AppPlugin(BasePlugin):
         pass
 
 
-class FarmsPlugin(BasePlugin):
+class FarmsWidget(BaseWidget):
     """FARMS data access - simulation, analysis plugins"""
     def __init__(self):
         super().__init__()
@@ -121,7 +121,7 @@ class FarmsPlugin(BasePlugin):
         pass
 
 
-class CustomPlugin(BasePlugin):
+class CustomWidget(BaseWidget):
     """No special access - user experiments, visualizations"""
     def __init__(self):
         super().__init__()
