@@ -1,6 +1,4 @@
-"""
-Main script to run the FARMS app
-"""
+""" Main script to run the FARMS app """
 
 from typing import List
 # from farms_app.core.options import ApplicationOptions
@@ -8,43 +6,94 @@ import numpy as np
 
 from farms_app.backends.manager import BackendManager
 from farms_app.backends.glfw_impl import OpenGLVersion
-from farms_app.plugins.base import BasePlugin
-from farms_app.plugins.defaults.simulation import ParameterEditorPlugin
-# from farms_app.plugins.defaults.logger import LoggerPlugin
-from farms_app.plugins.defaults.mujoco_impl import MuJoCoPlugin
-# from farms_app.plugins.defaults.network import NetworkPlugin
-from imgui_bundle import imgui
+from farms_app.extensions.manager import AppExtensionManager, InterfaceCategory
+from imgui_bundle import imgui, implot
+from farms_core import pylog
+from farms_app.utils import paths
+from farms_app.plots import flags
+from .options import ApplicationOptions
 
+
+pylog.set_level("debug")
 
 
 class FARMSApplication:
     """FARMS Application """
 
-    def __init__(self, **kwargs):
+    def __init__(self, options: ApplicationOptions):
         """Initialization"""
         super().__init__()
-        self.plugins: List[BasePlugin] = []
 
-        manager = BackendManager()
-        self.backend = manager.create_backend(backend_type="glfw", gl_version=OpenGLVersion.GL2)
-        self.backend.initialize()
+        self._options = options
+
+        # Setup backend
+        self.backend_manager = BackendManager()
+        self.backend = None
+        self._window = None
+        self._io = None
+        self._setup_backend(self._options)
+
+        self._run_disable_extension = False
+
+        # Fonts
+        self._io.fonts.add_font_from_file_ttf(
+            str(paths.get_project_root().joinpath(
+                "assests", "fonts", "JetBrainsMono[wght].ttf"
+            )),
+            18
+        )
+
+        # Setup plugins
+        self.extension_manager = AppExtensionManager(namespace="farms.app.interface")
+
+
+    def _setup_backend(self, options: ApplicationOptions):
+        """ Setup backend """
+        backend_manager = BackendManager()
+        self.backend = backend_manager.create_backend(
+            backend_type="glfw", gl_version=OpenGLVersion.GL2
+        )
+        self.backend.initialize(name=self._options.title)
         self._window = self.backend.window
         self._io = imgui.get_io()
 
-        self.plugins.append(ParameterEditorPlugin())
-        # self.plugins.append(LoggerPlugin())
-        self.plugins.append(MuJoCoPlugin())
-        # self.plugins.append(NetworkPlugin())
-
     @classmethod
-    def from_options(cls, options):
+    def from_options(cls, options: ApplicationOptions):
         """ Initialize using options """
-        ...
+        return cls(options)
+
+    def render_extensions(self):
+        for name, extension in self.extension_manager._enabled_exts.items():
+            extension.obj.render()
 
     def render_plugins(self):
         """Render all plugins"""
-        for plugin in self.plugins:
-            plugin.render()
+        for name, plugin in self.plugin_manager.get_loaded_plugins().items():
+            plugin.render_window()
+
+    def render_all_plugins(self):
+        """Render all plugins in order"""
+        # App plugins first (status bar, etc.)
+        for widget in self.plugin_manager.app_widgets.values():
+            widget.render()
+
+        for widget in self.plugin_manager.farms_widgets.values():
+            widget.render_window()
+
+        for widget in self.plugin_manager.custom_widgets.values():
+            widget.render_window()
+
+    def test_plot(self):
+        if imgui.begin("Test"):
+            # flags.seaborn_style()
+            axis_flags = implot.AxisFlags_.lock | implot.AxisFlags_.no_grid_lines # | implot.AxisFlags_.no_decorations
+            if implot.begin_plot("Plot", size=imgui.ImVec2((0, 0)), flags=implot.Flags_.equal | implot.Flags_.no_title):
+                implot.setup_axis(implot.ImAxis_.x1, flags=axis_flags)
+                implot.setup_axis(implot.ImAxis_.y1, flags=axis_flags)
+                implot.setup_axes_limits(0.0, 180.0, 0.0, 180.0)
+                implot.plot_line("##Plot1", np.random.random((180,))*180)
+                implot.end_plot()
+        imgui.end()
 
     def render_menu(self):
         """ Render menu """
@@ -55,9 +104,53 @@ class FARMSApplication:
             imgui.end_menu()
 
         if imgui.begin_menu("View"):
-            if imgui.menu_item("Plugins", shortcut="C", p_selected=True)[0]:
-                print("View")
+            if imgui.begin_menu("UI"):
+                for name, extension in self.extension_manager._enabled_exts.items():
+                    if extension.category == InterfaceCategory.UI:
+                        clicked, new_state = imgui.menu_item(
+                            name, shortcut="", p_selected=extension.obj.show_window
+                        )
+                        if clicked:
+                            extension.obj.show_window = new_state
+                imgui.end_menu()
+            imgui.separator()
+            if imgui.begin_menu("Workflow"):
+                for name, extension in self.extension_manager._enabled_exts.items():
+                    if extension.category == InterfaceCategory.WORKFLOW:
+                        clicked, new_state = imgui.menu_item(
+                            name, shortcut="", p_selected=extension.obj.show_window
+                        )
+                        if clicked:
+                            extension.obj.show_window = new_state
+                imgui.end_menu()
+            imgui.separator()
+            if imgui.begin_menu("Custom"):
+                for name, extension in self.extension_manager._enabled_exts.items():
+                    if extension.category == InterfaceCategory.CUSTOM:
+                        clicked, new_state = imgui.menu_item(
+                            name, shortcut="", p_selected=extension.obj.show_window
+                        )
+                        if clicked:
+                            extension.obj.show_window = new_state
+                imgui.end_menu()
             imgui.end_menu()
+
+        if imgui.begin_menu("Extensions"):
+            for name in self.extension_manager.names:
+                clicked, new_state = imgui.menu_item(
+                    name, shortcut="", p_selected=True if name in self.extension_manager._enabled_exts else False
+                )
+                if clicked and new_state:
+                    self.extension_manager.enable_extension(name)
+                elif clicked and not new_state:
+                    self.extension_manager._disabled_exts.append(name)
+                    self._run_disable_extension = True
+            imgui.end_menu()
+        # Run this after the menu is closed
+        if self._run_disable_extension:
+            for name in self.extension_manager._disabled_exts:
+                self.extension_manager.disable_extension(name)
+            self._run_disable_extension = False
         imgui.end_main_menu_bar()
 
     def run(self):
@@ -70,10 +163,13 @@ class FARMSApplication:
             # Start the Dear ImGui frame
             self.backend.begin_frame()
 
+            # Render main menu
             self.render_menu()
 
-            self.render_plugins()
+            # Render extensions
+            self.render_extensions()
 
+            # End the Dear ImGui frame
             self.backend.end_frame()
 
         # Cleanup
