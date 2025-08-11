@@ -54,3 +54,9 @@ Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 full = []
+
+[project.entry-points."farms.app.interface"]
+    status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
+    experimental = "farms_app.extensions.custom.experimental:ExperimentalExtension"
+    mujoco = "farms_app.extensions.custom.mujoco_impl:MujocoExtension"
+    hindlimb2D = "farms_app.extensions.custom.hindlimb_simulator:MouseHindlimb2DExtension"
