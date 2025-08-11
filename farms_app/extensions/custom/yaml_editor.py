@@ -1,4 +1,4 @@
-from ..base import BasePlugin
+from farms_app.plugins.base import CustomWidget
 
 from farms_core.io.yaml import read_yaml
 import yaml
@@ -8,7 +8,7 @@ from imgui_bundle import imgui
 yaml_data = read_yaml("/Users/tatarama/data/mouse/share/quadruped-jon/animat_options.yaml")
 
 
-class YAMLEditorPlugin(BasePlugin):
+class YAMLEditorPlugin(CustomWidget):
     """ Yaml Editor Plugin """
 
     def __init__(self):
@@ -55,14 +55,15 @@ class YAMLEditorPlugin(BasePlugin):
                 imgui.separator()
 
             # Text editor - show full or focused content
-            display_text = self.focused_yaml_text if self.focused_yaml_text else yaml.dump(yaml_data)
+            if self.focused_yaml_text:
+                display_text = self.focused_yaml_text
 
-            changed, new_text = imgui.input_text_multiline(
-                "##yaml_input",
-                display_text,
-                imgui.ImVec2(-1, -1),
-                imgui.InputTextFlags_.allow_tab_input | imgui.InputTextFlags_.read_only
-            )
+                changed, new_text = imgui.input_text_multiline(
+                    "##yaml_input",
+                    display_text,
+                    imgui.ImVec2(-1, -1),
+                    imgui.InputTextFlags_.allow_tab_input | imgui.InputTextFlags_.read_only
+                )
 
             # Note: Made read-only for focused sections to avoid conflicts
             # Full editing still works in tree view

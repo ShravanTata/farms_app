@@ -9,7 +9,7 @@ import OpenGL.GL as GL  # type: ignore
 from farms_core import pylog
 from imgui_bundle import imgui
 
-from ..base import BasePlugin
+from farms_app.extensions.base import CustomExtension
 
 model = mujoco.MjModel.from_xml_string(
 """<mujoco model="2-link 6-muscle arm">
@@ -118,6 +118,12 @@ model = mujoco.MjModel.from_xml_string(
 </mujoco>"""
 )
 
+model = mujoco.MjModel.from_xml_path("/Users/tatarama/fork/mujoco/model/humanoid/humanoid.xml")
+model = mujoco.MjModel.from_xml_path("/Users/tatarama/fork/mujoco_menagerie/unitree_a1/a1.xml")
+
+
+# model = mujoco.MjModel.from_xml_path("/Users/tatarama/projects/work/research/neuromechanics/quadruped/mice/mouse-locomotion/src/scripts/scratch/siggraph/logs/sim_mjcf.xml")
+
 data = mujoco.MjData(model)
 
 
@@ -152,12 +158,14 @@ _mjGEOMSTRING = (
 )
 
 
-class MuJoCoPlugin(BasePlugin):
+class MujocoExtension(CustomExtension):
     """ MuJoCo """
 
     def __init__(self):
-        self.show_window = True
+        self.show_window = False
+        self.window_name = "MuJoCo"
         self._io = imgui.get_io()
+        self.performance_warnings = []
 
         self.camera = mujoco.MjvCamera()
         self.option = mujoco.MjvOption()
@@ -170,7 +178,7 @@ class MuJoCoPlugin(BasePlugin):
         mujoco.mjv_defaultPerturb(self.perturb)
         mujoco.mjv_defaultOption(self.option)
         self.mj_context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150)
-        self.scene = mujoco.MjvScene(model, maxgeom=10000)
+        self.scene = mujoco.MjvScene(model, maxgeom=1000000)
 
         self.viewport = mujoco.MjrRect(0, 0, 0, 0)
         self.width, self.height = 1280, 720
@@ -181,6 +189,11 @@ class MuJoCoPlugin(BasePlugin):
         self.texture_id = None
         self.create_framebuffer(self.width, self.height)
 
+        self.start_time = data.time
+
+    def __del__(self):
+        print("Terminating MuJoCo Extension")
+
     def get_name(self) -> str:
         return "MuJoCo"
 
@@ -189,7 +202,7 @@ class MuJoCoPlugin(BasePlugin):
         self.texture_id = GL.glGenTextures(1)
 
         GL.glBindTexture(GL.GL_TEXTURE_2D, self.texture_id)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_SRGB_ALPHA, width, height, 0,
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, width, height, 0,
                         GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
         # Set texture parameters
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
@@ -219,7 +232,7 @@ class MuJoCoPlugin(BasePlugin):
 
         # GL.glEnable(GL.GL_MULTISAMPLE)
 
-        # Unbind framebuffer
+        # unbind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
     def resize_framebuffer(self, width, height):
@@ -236,14 +249,12 @@ class MuJoCoPlugin(BasePlugin):
 
         self.create_framebuffer(self.width, self.height)
 
-    def render(self) -> None:
-        if not self.show_window:
-            return
-
+    def render_window(self) -> None:
         # self.scene.flags[0] = 0
         # self.scene.flags[2] = 0
-
-        mujoco.mj_step(model, data)
+        self.start_time = data.time
+        while (data.time - self.start_time < 1.0/60.0):
+            mujoco.mj_step(model, data)
 
         # Bind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
@@ -251,7 +262,7 @@ class MuJoCoPlugin(BasePlugin):
 
         # Minimal OpenGL setup - let MuJoCo handle lighting
         # GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
+        # GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
         GL.glClearColor(0.1, 0.1, 0.1, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
@@ -259,10 +270,8 @@ class MuJoCoPlugin(BasePlugin):
         mujoco.mjv_updateScene(model, data, self.option, None, self.camera,
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         mujoco.mjr_render(self.viewport, self.scene, self.mj_context)
-        GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
+        # GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-
-        expanded, self.show_window = imgui.begin("Example: image display", self.show_window)
 
         if imgui.is_window_hovered():
             self.mouse_iteractions()
@@ -272,7 +281,6 @@ class MuJoCoPlugin(BasePlugin):
         avail_width, avail_height = imgui.get_content_region_avail()
         if avail_width <= 0 or avail_height <= 0:
             # Skip rendering this frame or use fallback size
-            imgui.end()
             return
         current_aspect = avail_width / avail_height
         if current_aspect > target_aspect:
@@ -286,12 +294,11 @@ class MuJoCoPlugin(BasePlugin):
 
         imgui.image(
             int(self.texture_id),
-           imgui.ImVec2((draw_width, draw_height)),
+            imgui.ImVec2((draw_width, draw_height)),
             uv0=imgui.ImVec2((1,1)),
             uv1=imgui.ImVec2((0,0)),
             # border_color=imgui.ImVec4((1, 0, 0, 1))
         )
-        imgui.end()
 
     def __mj_keys(self, mjSTRING: tuple[str, str, str], mj_flags):
         for j, _opt in enumerate(mjSTRING):

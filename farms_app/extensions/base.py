@@ -1,4 +1,4 @@
-""" Base class implementation for plugin system """
+""" Base class implementation for application extension system """
 
 
 import time
@@ -7,34 +7,36 @@ from abc import ABC, abstractmethod
 from imgui_bundle import imgui
 
 
-class BaseWidget(ABC):
-    """Widget base class"""
+class BaseExtension(ABC):
+    """Extension base  class"""
+
+    farms_name = "Base"
+    farms_stage = ""
+    farms_version = ""
+    farms_author = ""
 
     def __init__(self):
         ""
         super().__init__()
-        self.show_window = True
+        self.show_window: bool = True
         self.window_name = "Base Widget"
         self.stage = None
         self.performance_warnings = []
 
+    # @abstractmethod
+    # def initialize(context: AppContext) -> bool:
+    #     pass
+
     @abstractmethod
-    def get_name(self) -> str:
+    def render(self) -> None:
         pass
+
+    # @abstractmethod
+    # def cleanup() -> None:
+    #     pass
 
     def get_info():
         pass
-
-    def render_window(self):
-        if not self.show_window:
-            return
-
-        expanded, _ = imgui.begin(
-            self.window_name, self.show_window, flags=imgui.WindowFlags_.menu_bar
-        )
-        if expanded:
-            self._render_with_timing()
-        imgui.end()
 
     def _render_with_timing(self):
         start_time = time.perf_counter()
@@ -66,16 +68,12 @@ class BaseWidget(ABC):
             if imgui.button("Clear Warnings"):
                 self.performance_warnings.clear()
 
-    @abstractmethod
-    def render(self) -> None:
-        pass
-
     # @abstractmethod
-    # def get_dependencies() -> List[str]:
+    # def get_name(self) -> str:
     #     pass
 
     # @abstractmethod
-    # def initialize(context: AppContext) -> bool:
+    # def get_dependencies() -> List[str]:
     #     pass
 
     # @abstractmethod
@@ -94,39 +92,53 @@ class BaseWidget(ABC):
     # def update(delta_time: float) -> None:
     #     pass
 
-    # @abstractmethod
-    # def cleanup() -> None:
-    #     pass
 
-
-class AppWidget(BaseWidget):
+class UIExtension(BaseExtension):
     """Full access - internal app components like status bar, menu bar"""
     def __init__(self, app_context):
         super().__init__()
         self.app_context = app_context  # Full access
 
-    @abstractmethod
-    def render(self):
-        pass
 
-
-class FarmsWidget(BaseWidget):
+class WorkflowExtension(BaseExtension):
     """FARMS data access - simulation, analysis plugins"""
     def __init__(self):
         super().__init__()
         self.farms_data = None  # Set by plugin manager
 
-    @abstractmethod
     def render(self):
+        if not self.show_window:
+            return
+
+        expanded, _ = imgui.begin(
+            self.window_name, self.show_window, flags=imgui.WindowFlags_.menu_bar
+        )
+        if expanded:
+            self.render_window()
+        imgui.end()
+
+    @abstractmethod
+    def render_window(self):
         pass
 
 
-class CustomWidget(BaseWidget):
+class CustomExtension(BaseExtension):
     """No special access - user experiments, visualizations"""
     def __init__(self):
         super().__init__()
         # No special data access
 
-    @abstractmethod
     def render(self):
+        if not self.show_window:
+            return
+
+        expanded, _ = imgui.begin(
+            self.window_name, self.show_window, flags=imgui.WindowFlags_.menu_bar
+        )
+        if expanded:
+            self.render_window()
+        imgui.end()
+
+    @abstractmethod
+    def render_window(self):
         pass
