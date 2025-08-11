@@ -12,7 +12,7 @@ from farms_core import pylog
 
 
 if platform.system() == "Darwin":
-    from imgui_bundle import imgui, implot
+    from imgui_bundle import imgui, implot, implot3d
     # Important to import GL and glfw after imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
@@ -20,12 +20,12 @@ elif platform.system() == "Linux":
     # Important to import GL before imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
-    from imgui_bundle import imgui, implot
+    from imgui_bundle import imgui, implot, implot3d
 else:
     # Important to import GL before imgui for cross-platform support of GL2
     import OpenGL.GL as GL
     import glfw
-    from imgui_bundle import imgui, implot
+    from imgui_bundle import imgui, implot, implot3d
 
 
 class OpenGLVersion(Enum):
@@ -113,6 +113,7 @@ class GLFWBackend(BaseBackend):
         """Setup ImGui context and backends"""
         imgui.create_context()
         _ = implot.create_context()
+        _ = implot3d.create_context()
         io = imgui.get_io()
 
         # Configure ImGui
@@ -120,12 +121,13 @@ class GLFWBackend(BaseBackend):
         io.config_flags |= imgui.ConfigFlags_.docking_enable.value
         if platform.system() != "Linux":
             io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
-            io.config_viewports_no_auto_merge = False
+            io.config_viewports_no_auto_merge = True
             io.config_viewports_no_task_bar_icon = True
 
         # Setup style
-        imgui.style_colors_dark()
-        implot.style_colors_dark()
+        imgui.style_colors_light()
+        implot.style_colors_auto()
+        implot3d.style_colors_auto()
 
         # Viewport style adjustments
         style = imgui.get_style()
@@ -190,7 +192,7 @@ class GLFWBackend(BaseBackend):
             imgui.backends.opengl2_new_frame()
         imgui.backends.glfw_new_frame()
         imgui.new_frame()
-        imgui.dock_space_over_viewport()
+        imgui.dock_space_over_viewport(viewport=imgui.get_main_viewport())
 
     def end_frame(self):
         """End frame rendering"""
