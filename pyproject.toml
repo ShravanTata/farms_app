@@ -19,6 +19,7 @@ dependencies = [
     "rich",
     "h5py",
     "mujoco",
+    "stevedore",
     "farms_core @ git+https://github.com/farmsim/farms_core.git",
 ] # keep in sync with `min_numpy_version` in meson.build
 
