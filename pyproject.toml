@@ -61,6 +61,9 @@ full = [
 [project.scripts]
 farms-app = "scripts.run:main"
 
+[tool.setuptools.packages.find]
+where = ["farms_app"]
+
 [tool.setuptools.package-data]
 farms_app = [
           "assests/fonts/*.ttf"
