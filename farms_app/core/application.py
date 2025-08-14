@@ -32,6 +32,7 @@ class FARMSApplication:
         self._window = None
         self._io = None
         self._setup_backend(self._options)
+        self.show_metrics_window = False
 
         self._run_disable_extension = False
 
@@ -99,8 +100,9 @@ class FARMSApplication:
         """ Render menu """
         imgui.begin_main_menu_bar()
         if imgui.begin_menu("File"):
-            if imgui.menu_item("New Project", shortcut="N", p_selected=True)[0]:
-                print("New project")
+            clicked, new_state = imgui.menu_item("Show Metrics", shortcut="N", p_selected=self.show_metrics_window)
+            if clicked:
+                self.show_metrics_window = new_state
             imgui.end_menu()
 
         if imgui.begin_menu("View"):
@@ -165,6 +167,9 @@ class FARMSApplication:
 
             # Render main menu
             self.render_menu()
+
+            if self.show_metrics_window:
+                imgui.show_metrics_window()
 
             # Render extensions
             self.render_extensions()
