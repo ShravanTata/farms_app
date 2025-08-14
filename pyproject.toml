@@ -61,6 +61,11 @@ full = [
 [project.scripts]
 farms-app = "scripts.run:main"
 
+[tool.setuptools.package-data]
+farms_app = [
+          "assests/fonts/*.ttf"
+]
+
 [project.entry-points."farms.app.interface"]
     status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
     experimental = "farms_app.extensions.custom.experimental:ExperimentalExtension"
