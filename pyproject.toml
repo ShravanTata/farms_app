@@ -59,7 +59,7 @@ full = [
 ]
 
 [project.scripts]
-farms-app = "scripts.run:main"
+farms-app = "farms_app.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]  # Change this - look in current directory
