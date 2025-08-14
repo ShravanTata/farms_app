@@ -62,11 +62,13 @@ full = [
 farms-app = "scripts.run:main"
 
 [tool.setuptools.packages.find]
-where = ["farms_app"]
+where = ["."]  # Change this - look in current directory
+include = ["farms_app*"]  # Include farms_app and subpackages
 
 [tool.setuptools.package-data]
 farms_app = [
-          "assets/fonts/*.ttf"
+          "assets/fonts/*.ttf",
+           "assets/**/*"
 ]
 
 [project.entry-points."farms.app.interface"]
