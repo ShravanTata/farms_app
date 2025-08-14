@@ -18,7 +18,6 @@ dependencies = [
     "pyyaml",
     "rich",
     "h5py",
-    "mujoco",
     "stevedore",
     "farms_core @ git+https://github.com/farmsim/farms_core.git",
 ] # keep in sync with `min_numpy_version` in meson.build
@@ -54,7 +53,10 @@ Issues = "https://github.com/farmsim/farms_app/issues"
 Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
-full = []
+full = [
+     "mujoco",
+     "pandas"
+]
 
 [project.entry-points."farms.app.interface"]
     status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
