@@ -39,7 +39,7 @@ class FARMSApplication:
         # Fonts
         self._io.fonts.add_font_from_file_ttf(
             str(paths.get_project_root().joinpath(
-                "farms_app", "assests", "fonts", "JetBrainsMono[wght].ttf"
+                "farms_app", "assets", "fonts", "JetBrainsMono[wght].ttf"
             )),
             18
         )

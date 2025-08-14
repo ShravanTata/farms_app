@@ -66,7 +66,7 @@ where = ["farms_app"]
 
 [tool.setuptools.package-data]
 farms_app = [
-          "assests/fonts/*.ttf"
+          "assets/fonts/*.ttf"
 ]
 
 [project.entry-points."farms.app.interface"]
