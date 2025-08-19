@@ -137,6 +137,20 @@ class FARMSApplication:
                 imgui.end_menu()
             imgui.end_menu()
 
+        if imgui.begin_menu("Debug"):
+            clicked, new_state = imgui.menu_item("Show Metrics", shortcut="", p_selected=self.show_metrics_window)
+            if clicked:
+                self.show_metrics_window = new_state
+            if imgui.begin_menu("Level"):
+                if imgui.menu_item("debug", shortcut="", p_selected=(pylog.get_level()=="debug"))[0]:
+                    pylog.set_level("debug")
+                if imgui.menu_item("info", shortcut="", p_selected=(pylog.get_level()=="info"))[0]:
+                    pylog.set_level("info")
+                if imgui.menu_item("warning", shortcut="", p_selected=(pylog.get_level()=="warning"))[0]:
+                    pylog.set_level("warning")
+                imgui.end_menu()
+            imgui.end_menu()
+
         if imgui.begin_menu("Extensions"):
             for name in self.extension_manager.names:
                 clicked, new_state = imgui.menu_item(
