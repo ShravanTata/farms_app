@@ -13,13 +13,13 @@ maintainers = [
 requires-python = ">=3.10"
 dependencies = [
     "numpy <= 1.26.4",
-    "imgui_bundle == 1.6.3",
+    "imgui_bundle",
     "tqdm",
     "pyyaml",
     "rich",
     "h5py",
     "stevedore",
-    "farms_core @ git+https://github.com/farmsim/farms_core.git",
+    # "farms_core @ git+https://github.com/farmsim/farms_core.git",
 ] # keep in sync with `min_numpy_version` in meson.build
 
 readme = "README.md"
