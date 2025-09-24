@@ -1,6 +1,6 @@
 """ Statu Bar """
 
-from farms_app.extensions.base import UIExtension
+from farms_app.core.extension import UIExtension
 
 from imgui_bundle import imgui
 
