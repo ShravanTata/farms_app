@@ -147,7 +147,13 @@ class MainExtensionWindow(BaseWindow):
             imgui.WindowFlags_.menu_bar |
             imgui.WindowFlags_.no_title_bar
         )
-        super().__init__(name, extension, window_flags, visible=True, dock_to_extension=False)
+        super().__init__(
+            name=name,
+            extension=extension,
+            window_flags=window_flags,
+            visible=False,
+            dock_to_extension=False
+        )
         # Create unique dockspace ID for this extension
         self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
         # Track docked windows
