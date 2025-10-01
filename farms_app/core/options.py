@@ -7,15 +7,77 @@ from farms_app.backends.manager import PlatformType, RendererType
 from farms_core.options import Options
 
 
+class PlatformType(StrEnum):
+    """ Type of Platform """
+    GLFW = 'glfw'
+
+
+class RendererType(StrEnum):
+    """ Type of Renderer """
+    OPENGL2 = 'gl2'
+    OPENGL3 = 'gl3'
+
+
+class BackendOptions(Options):
+    """ Backend renderer options """
+
+    def __init__(self):
+        super().__init__()
+        self.platform = PlatformType.GLFW.value
+        self.renderer = RendererType.OPENGL2.value
+
+
+class PlatformOptions(Options):
+    """ Base class for different types of platform options """
+
+    def __init__(self):
+        ...
+
+
+class LaunchOptions(Options):
+    """ Setup options to configure the interface at launch  """
+
+    def __init__(self, **kwargs):
+        self.title = kwargs.pop("title", "FARMS")  # FARMS by default
+        self.geometry: Iterable[int, int] = kwargs.pop("geometry", [720, 1080])
+        self.resizable: bool = kwargs.pop("resizable", True)
+
+
+class WindowOptions(Options):
+    """ Window options """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.vsync = kwargs.pop("vsync", True)
+        self.fullscreen = kwargs.pop("fullscreen", False)
+
+
+class DockingOptions(Options):
+    """ Docking Options """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.enabled = kwargs.pop("enabled", True)
+        self.layout_config = kwargs.pop("layout_config", None)
+
+
+class ExtensionOptions(Options):
+    """Extension Options """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.auto_load = kwargs.pop("auto_load", True)
+
+
 class ApplicationOptions(Options):
     """ Application options """
 
     def __init__(
             self,
-            backend_options: 'BackendOptions',
-            window_options: 'WindowOptions',
-            docking_options: 'DockingOptions',
-            extension_options: 'ExtensionOptions',
+            backend_options: BackendOptions = BackendOptions(),
+            window_options: WindowOptions = WindowOptions(),
+            docking_options: DockingOptions = DockingOptions(),
+            extension_options: ExtensionOptions = ExtensionOptions(),
             **kwargs
     ):
         "Initialize"
@@ -46,59 +108,6 @@ class ApplicationOptions(Options):
         self.fps = kwargs.pop("fps", 60.0)       # 60 FPS by default
 
         # Plot options
-
-
-class PlatformType(StrEnum):
-    """ Type of Platform """
-    GLFW = 'glfw'
-
-
-class RendererType(StrEnum):
-    """ Type of Renderer """
-    OPENGL2 = 'gl2'
-    OPENGL3 = 'gl3'
-
-
-class BackendOptions(Options):
-    """ Backend renderer options """
-
-    def __init__(self):
-        super().__init__()
-        self.platform = PlatformType.GLFW.value
-        self.renderer = RendererType.OPENGL2.value
-
-
-class PlatformOptions(Options):
-    """ Base class for different types of platform options """
-
-    def __init__(self):
-        ...
-
-
-class WindowOptions(Options):
-    """ Window options """
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.vsync = kwargs.pop("vsync", True)
-        self.fullscreen = kwargs.pop("fullscreen", False)
-
-
-class DockingOptions(Options):
-    """ Docking Options """
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.enabled = kwargs.pop("enabled", True)
-        self.layout_config = kwargs.pop("layout_config", None)
-
-
-class ExtensionOptions(Options):
-    """Extension Options """
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.auto_load = kwargs.pop("auto_load", True)
 
 
 if __name__ == '__main__':
