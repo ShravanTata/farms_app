@@ -155,3 +155,260 @@ class EnabledExtension:
         self.category: ExtensionCategory = category
 
 
+##############
+# Extensions #
+##############
+class BaseExtension(ABC):
+    """Extension base  class"""
+
+    def __init__(self, name: str):
+
+        self.name = name
+        self.hide: bool = False
+        self.windows: List[BaseWindow] = []
+        self._performance_warnings: List[str] = []
+        self.main_window = None
+
+    ###########
+    # Windows #
+    ###########
+    def register_window(self, window: BaseWindow):
+        """ Register a new window """
+        self.windows.append(window)
+        # if self._window_manager:
+        #     self._window_manager.register_window(window)
+
+    def create_main_window(self) -> MainExtensionWindow:
+        """Create the main extension window with dockspace"""
+        if self.main_window is None and self._needs_main_window:
+            self.main_window = MainExtensionWindow(self)
+            self.register_window(self.main_window)
+            return self.main_window
+        else:
+            return None
+
+    def unregister_window(self, window: BaseWindow):
+        """Unregister a window from this extension"""
+        if window in self.windows:
+            self.windows.remove(window)
+        # if self._window_manager:
+        #     self._window_manager.unregister_window(window)
+
+    def show_all_windows(self):
+        """Show all windows for this extension"""
+        for window in self.windows:
+            window.show()
+
+    def hide_all_windows(self):
+        """Hide all windows for this extension"""
+        for window in self.windows:
+            window.hide()
+
+    def dock_all_windows_to_extension(self):
+        """Dock all windows back to extension dockspace"""
+        for window in self.windows:
+            if window != self.main_window:
+                window.dock_to_extension()
+
+    #############
+    # Lifecycle #
+    #############
+    def before_render(self) -> None:
+        """Steps to perform before calling the renderer."""
+        return
+
+    @abstractmethod
+    def render(self) -> None:
+        """Main render loop for this extension."""
+
+    def after_render(self) -> None:
+        """Steps to perform after calling the renderer."""
+        return
+
+    @abstractmethod
+    def cleanup(self) -> None:
+        """Clean up resources before shutdown or reload."""
+
+    def _needs_main_window(self) -> bool:
+        """Override to specify if extension needs a main docking window"""
+        return True
+
+    ############
+    # Metadata #
+    ############
+    def get_info(self) -> dict:
+        """Return extension metadata (override if needed)."""
+        return {
+            "name": self.name,
+            "windows": self.windows,
+            "hidden": self.hide,
+        }
+
+    @abstractmethod
+    def get_dependencies(self) -> List[str]:
+        """Return a list of dependencies that this extension requires."""
+
+    ####################
+    # State management #
+    ####################
+    def on_enable(self) -> bool:
+        """Enable the extension (return True on success)."""
+
+    def on_disable(self) -> bool:
+        """Disable the extension (return True on success)."""
+
+    def on_reload(self) -> bool:
+        """Safely reload and reinitialize the extension."""
+
+    ###########
+    # Utility #
+    ###########
+    def create_window_id(self, window_name: str) -> str:
+        """Create a unique window identifier for this extension."""
+        return f"{window_name}##{self.name}"
+
+    def _render_with_timing(self) -> None:
+        """Render extension with performance timing and warnings."""
+        start_time = time.perf_counter()
+
+        try:
+            self.render()
+        except Exception as e:
+            imgui.text_colored((1, 0, 0, 1), f"⚠️ Widget Error: {e}")
+            return
+
+        render_time = time.perf_counter() - start_time
+
+        # Warn about slow renders
+        if render_time > 0.03:  # ~30 FPS threshold
+            warning = f"Slow render: {render_time*1000:.1f} ms"
+            self._performance_warnings.append(warning)
+            print(f"⚠️ Extension '{self.name}': {warning}")
+
+        self._show_performance_warnings()
+
+    def _show_performance_warnings(self) -> None:
+        """Display performance warnings in the GUI."""
+        if not self._performance_warnings:
+            return
+
+        imgui.separator()
+        imgui.text_colored((1, 1, 0, 1), "⚠️ Performance Warnings:")
+        for warning in self._performance_warnings[-3:]:  # Show last 3
+            imgui.text_colored((1, 1, 0, 1), f"  {warning}")
+
+        if imgui.button("Clear Warnings"):
+            self._performance_warnings.clear()
+
+
+class UIExtension(BaseExtension):
+    """
+    Full app interface access.
+    Can modify menus, toolbars, status bars, and global UI.
+    """
+
+    CATEGORY = ExtensionCategory.UI
+
+    def __init__(self, name: str):
+        super().__init__(name=name)
+
+    def _needs_main_window(self) -> bool:
+        """UI extensions typically don't need their own docking space"""
+        return False
+
+    # @abstractmethod
+    def before_render(self) -> None:
+        """ Steps to perform before calling the renderer """
+
+    @abstractmethod
+    def render(self) -> None:
+        """ Main render """
+
+    # @abstractmethod
+    def after_render(self) -> None:
+        """ Steps to perform before calling the renderer """
+
+
+class WorkflowExtension(BaseExtension):
+    """
+    FARMS domain access.
+    Can read/write simulation data, add workflow windows.
+    """
+
+    CATEGORY = ExtensionCategory.WORKFLOW
+
+    def __init__(self, name: str):
+        super().__init__(name=name)
+        self.main_window = MainExtensionWindow(self)
+        self.farms_data = None  # Set by plugin manager
+        self.stage: Optional[str] = None
+
+    def render_menu(self):
+        """ Render menu """
+        imgui.begin_main_menu_bar()
+
+        if imgui.begin_menu(f"{self.name}"):
+            imgui.text("Hello")
+            imgui.end_menu()
+        imgui.end_main_menu_bar()
+
+    def before_render(self):
+        pass
+
+    def render(self):
+        if not self.hide:
+            return
+
+        # Render main window
+        self.main_window._render()
+        # Render other associated windows
+        for window in self.windows:
+            imgui.set_next_window_dock_id(
+                self.main_window.dockspace_id,
+                cond=imgui.Cond_.once
+            )
+            window._render()
+
+    def after_render(self):
+        pass
+
+    @abstractmethod
+    def render_window(self):
+        pass
+
+
+class CustomExtension(BaseExtension):
+    """
+    Independent / standalone extensions.
+    Minimal host context; no FARMS data required.
+    user experiments, visualizations, no communication between extensions
+    """
+
+    CATEGORY = ExtensionCategory.CUSTOM
+
+    def __init__(self, name: str):
+        # No special data access
+        super().__init__(name=name)
+        self.main_window = MainExtensionWindow(self)
+
+    def render_menu(self):
+        """ Render menu """
+        pass
+
+    def render(self):
+        if self.hide:
+            return
+
+        # Render main window
+        self.main_window._render()
+        # Render other associated windows
+        for window in self.windows:
+            imgui.set_next_window_dock_id(
+                self.main_window.dockspace_id,
+                cond=imgui.Cond_.once
+            )
+            window._render()
+
+    @abstractmethod
+    def render_window(self):
+        pass
