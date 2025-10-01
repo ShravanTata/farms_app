@@ -138,7 +138,32 @@ class BaseWindow(ABC):
         self._dock_to_extension = state.get('dock_to_extension', True)
 
 
+class MainExtensionWindow(BaseWindow):
+    """ Main extension window """
 
-    def create_window_id(self, name: str, extension: str) -> str:
-        """ Useful for creating extension specific window names """
-        return f"{extension}##{name}"
+    def __init__(self, extension: BaseExtension):
+        name: str = f"{extension.name}##main"
+        window_flags = (
+            imgui.WindowFlags_.menu_bar |
+            imgui.WindowFlags_.no_title_bar
+        )
+        super().__init__(name, extension, window_flags, visible=True, dock_to_extension=False)
+        # Create unique dockspace ID for this extension
+        self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
+        # Track docked windows
+        self._docked_windows = set()
+
+    def _render(self):
+        """ Internal main render call """
+        if imgui.begin(self._window_id, flags=self._window_flags):
+            self.render_content()
+        imgui.end()
+
+    def render_content(self):
+        """ Render main extension dockspace """
+        # Each window gets its own dockspace ID
+        imgui.dock_space(
+            self.dockspace_id,
+            (0.0, 0.0),
+            imgui.DockNodeFlags_.passthru_central_node
+        )
