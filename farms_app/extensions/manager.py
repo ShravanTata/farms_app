@@ -1,11 +1,14 @@
 """ Plugin Manager """
 
 import inspect
+import traceback
 from abc import ABC
 from enum import StrEnum
+from typing import Type
+from rich.console import Console
 
 from farms_core import pylog
-from stevedore import DriverManager, EnabledExtensionManager
+from stevedore import DriverManager, EnabledExtensionManager, extension
 
 from .base import (BaseExtension, CustomExtension, UIExtension,
                    WorkflowExtension)
@@ -18,7 +21,7 @@ class InterfaceCategory(StrEnum):
 
 
 class EnabledExtension:
-    """ Book keeping for enabled extension """
+    """ Manager for enabled extension """
 
     def __init__(self, entry_point: str, obj: BaseExtension, category: InterfaceCategory):
         super().__init__()
@@ -32,6 +35,7 @@ class EnabledExtension:
 def create_ext_load_error_cb(fail_on_load=True):
     def ext_load_error_cb(manager, entry_point, exception):
         pylog.error(f"Could not load extension {entry_point} by {manager}")
+        AppExtensionManager.console.print_exception(exception)
         if fail_on_load:
             raise exception
     return ext_load_error_cb
@@ -46,6 +50,48 @@ def create_ext_check_func(base_extension: ABC):
     return ext_check_func
 
 
+class BaseExtensionManager(ABC):
+    """ Base class defining extension managers in FARMS
+
+    Responsibilities:
+    - Namespace based plugin discovery from multiple sources
+    - Dependency resolution and loading order
+    - Enable/Disable flags
+    - Hot-reloading for development
+
+    """
+
+    def __init__(
+            self,
+            namespace: str,
+            manager_type: Type = extension.ExtensionManager,
+            **manager_kwargs
+    ):
+        super().__init__()
+
+        self.namespace: str = namespace
+        self.manager_type = manager_type
+        self.manager_kwargs = manager_kwargs
+        self._discovered_extensions = {}
+        self._instantiated_extensions = {}
+
+    def discover(self):
+        """ Discover """
+        self._manager = self.manager_type(
+            namespace=self.namespace,
+            invoke_on_load=self.invoke_on_load,
+            **manager_kwargs
+        )
+
+    def instantiate(self, name: str, *args, **kwargs):
+        """ instatiate """
+        pass
+
+    def get_instance(self, name: str):
+        """ Get instance of an instatiated extension """
+        pass
+
+
 class AppExtensionManager():
     """Manager class for all App Extensions under the namespace farms.app
 
@@ -55,12 +101,13 @@ class AppExtensionManager():
     - Runtime enable/disable
     - Hot-reloading for development
     """
+    console = Console()
 
     def __init__(self, namespace: str):
         super().__init__()
 
         interface_ext_check_func = create_ext_check_func(BaseExtension)
-        interface_load_error_cb = create_ext_load_error_cb(fail_on_load=False)
+        interface_load_error_cb = create_ext_load_error_cb(fail_on_load=True)
 
         self.interface_mgr = EnabledExtensionManager(
             namespace=namespace,
@@ -101,8 +148,9 @@ class AppExtensionManager():
                 category=AppExtensionManager._get_extension_type(_ext.plugin)
             )
         except Exception as e:
-                pylog.error(f"Failed enabling extension {name} with error: {e}")
-                return False
+            pylog.error(f"Failed enabling extension {name} with error: {e}")
+            AppExtensionManager.console.print_exception(show_locals=True)
+            return False
 
     def disable_extension(self, name: str) -> bool:
         """ Disable a plugin """

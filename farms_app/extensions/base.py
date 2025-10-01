@@ -20,8 +20,10 @@ class BaseExtension(ABC):
         super().__init__()
         self.show_window: bool = True
         self.window_name = "Base Widget"
+        self.name: str = "Name"
         self.stage = None
         self.performance_warnings = []
+        self.windows = []
 
     # @abstractmethod
     # def initialize(context: AppContext) -> bool:
@@ -68,6 +70,10 @@ class BaseExtension(ABC):
             if imgui.button("Clear Warnings"):
                 self.performance_warnings.clear()
 
+    def create_window_id(self, name: str) -> str:
+        """ Useful for creating extension specific window names """
+        return f"{self.window_name}##{name}"
+
     # @abstractmethod
     # def get_name(self) -> str:
     #     pass
@@ -94,17 +100,33 @@ class BaseExtension(ABC):
 
 
 class UIExtension(BaseExtension):
-    """Full access - internal app components like status bar, menu bar"""
-    def __init__(self, app_context):
+    """
+    Full app interface access.
+    Can modify menus, toolbars, status bars, and global UI.
+    """
+    def __init__(self):
         super().__init__()
-        self.app_context = app_context  # Full access
+        self.app_context = None  # Full access
 
 
 class WorkflowExtension(BaseExtension):
-    """FARMS data access - simulation, analysis plugins"""
+    """
+    FARMS domain access.
+    Can read/write simulation data, add workflow windows.
+    """
     def __init__(self):
         super().__init__()
         self.farms_data = None  # Set by plugin manager
+        self.is_focused = False
+
+    def render_menu(self):
+        """ Render menu """
+        imgui.begin_main_menu_bar()
+
+        if imgui.begin_menu(f"{self.window_name}"):
+            imgui.text("Hello")
+            imgui.end_menu()
+        imgui.end_main_menu_bar()
 
     def render(self):
         if not self.show_window:
@@ -114,7 +136,9 @@ class WorkflowExtension(BaseExtension):
             self.window_name, self.show_window, flags=imgui.WindowFlags_.menu_bar
         )
         if expanded:
+            self.is_focused = imgui.is_window_focused(imgui.FocusedFlags_.root_and_child_windows)
             self.render_window()
+            self.is_focused = imgui.is_window_focused(imgui.FocusedFlags_.root_and_child_windows)
         imgui.end()
 
     @abstractmethod
@@ -123,7 +147,11 @@ class WorkflowExtension(BaseExtension):
 
 
 class CustomExtension(BaseExtension):
-    """No special access - user experiments, visualizations"""
+    """
+    Independent / standalone extensions.
+    Minimal host context; no FARMS data required.
+    user experiments, visualizations, no communication between extensions
+    """
     def __init__(self):
         super().__init__()
         # No special data access
