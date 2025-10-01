@@ -12,6 +12,7 @@ from imgui_bundle import imgui
 from rich.console import Console
 from stevedore import EnabledExtensionManager, extension
 
+EXTENSION_NAMESPACE = "farms.app.extension"
 
 
 ###########
