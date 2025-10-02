@@ -66,50 +66,31 @@ class FARMSApplication:
 
     def render_extensions(self):
         for name, extension in self.extension_manager._enabled_exts.items():
-            extension.obj.render()
-
-    def render_plugins(self):
-        """Render all plugins"""
-        for name, plugin in self.plugin_manager.get_loaded_plugins().items():
-            plugin.render_window()
-
-    def render_all_plugins(self):
-        """Render all plugins in order"""
-        # App plugins first (status bar, etc.)
-        for widget in self.plugin_manager.app_widgets.values():
-            widget.render()
-
-        for widget in self.plugin_manager.farms_widgets.values():
-            widget.render_window()
-
-        for widget in self.plugin_manager.custom_widgets.values():
-            widget.render_window()
-
-    def test_plot(self):
-        if imgui.begin("Test"):
-            # flags.seaborn_style()
-            axis_flags = implot.AxisFlags_.lock | implot.AxisFlags_.no_grid_lines # | implot.AxisFlags_.no_decorations
-            if implot.begin_plot("Plot", size=imgui.ImVec2((0, 0)), flags=implot.Flags_.equal | implot.Flags_.no_title):
-                implot.setup_axis(implot.ImAxis_.x1, flags=axis_flags)
-                implot.setup_axis(implot.ImAxis_.y1, flags=axis_flags)
-                implot.setup_axes_limits(0.0, 180.0, 0.0, 180.0)
-                implot.plot_line("##Plot1", np.random.random((180,))*180)
-                implot.end_plot()
-        imgui.end()
+            if extension.category == ExtensionCategory.UI:
+                extension.obj.render()
+            elif extension.category == ExtensionCategory.WORKFLOW:
+                extension.obj.render()
+            elif extension.category == ExtensionCategory.CUSTOM:
+                extension.obj.render()
+            # render menu
+            try:
+                if extension.obj.is_focused:
+                    extension.obj.render_menu()
+            except:
+                pass
 
     def render_menu(self):
         """ Render menu """
         imgui.begin_main_menu_bar()
-        if imgui.begin_menu("File"):
-            clicked, new_state = imgui.menu_item("Show Metrics", shortcut="N", p_selected=self.show_metrics_window)
-            if clicked:
-                self.show_metrics_window = new_state
-            imgui.end_menu()
 
         if imgui.begin_menu("View"):
+            if imgui.begin_menu("Theme"):
+                imgui.show_style_selector("Styles")
+                imgui.show_style_editor()
+                imgui.end_menu()
             if imgui.begin_menu("UI"):
                 for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == InterfaceCategory.UI:
+                    if extension.category == ExtensionCategory.UI:
                         clicked, new_state = imgui.menu_item(
                             name, shortcut="", p_selected=extension.obj.show_window
                         )
@@ -119,7 +100,7 @@ class FARMSApplication:
             imgui.separator()
             if imgui.begin_menu("Workflow"):
                 for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == InterfaceCategory.WORKFLOW:
+                    if extension.category == ExtensionCategory.WORKFLOW:
                         clicked, new_state = imgui.menu_item(
                             name, shortcut="", p_selected=extension.obj.show_window
                         )
@@ -129,7 +110,7 @@ class FARMSApplication:
             imgui.separator()
             if imgui.begin_menu("Custom"):
                 for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == InterfaceCategory.CUSTOM:
+                    if extension.category == ExtensionCategory.CUSTOM:
                         clicked, new_state = imgui.menu_item(
                             name, shortcut="", p_selected=extension.obj.show_window
                         )
@@ -158,7 +139,7 @@ class FARMSApplication:
                     name, shortcut="", p_selected=True if name in self.extension_manager._enabled_exts else False
                 )
                 if clicked and new_state:
-                    self.extension_manager.enable_extension(name)
+                    self.extension_manager.enable(name)
                 elif clicked and not new_state:
                     self.extension_manager._disabled_exts.append(name)
                     self._run_disable_extension = True
@@ -166,7 +147,7 @@ class FARMSApplication:
         # Run this after the menu is closed
         if self._run_disable_extension:
             for name in self.extension_manager._disabled_exts:
-                self.extension_manager.disable_extension(name)
+                self.extension_manager.disable(name)
             self._run_disable_extension = False
         imgui.end_main_menu_bar()
 
@@ -182,6 +163,7 @@ class FARMSApplication:
 
             # Render main menu
             self.render_menu()
+            default_main_menu()
 
             if self.show_metrics_window:
                 imgui.show_metrics_window()
@@ -194,13 +176,3 @@ class FARMSApplication:
 
         # Cleanup
         self.backend.cleanup()
-
-
-def main():
-    """ main """
-    app = FARMSApplication()
-    app.run()
-
-
-if __name__ == '__main__':
-    main()
