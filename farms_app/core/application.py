@@ -1,18 +1,19 @@
 """ Main script to run the FARMS app """
 
 from typing import List
+
 # from farms_app.core.options import ApplicationOptions
 import numpy as np
-
-from farms_app.backends.manager import BackendManager
 from farms_app.backends.glfw_impl import OpenGLVersion
-from farms_app.extensions.manager import AppExtensionManager, InterfaceCategory
-from imgui_bundle import imgui, implot
-from farms_core import pylog
+from farms_app.backends.manager import BackendManager
+from farms_app.console import console
+from farms_app.core.extension import ExtensionCategory, ExtensionManager
+from farms_app.core.menus import default_main_menu
 from farms_app.utils import paths
-from farms_app.plots import flags
-from .options import ApplicationOptions
+from farms_core import pylog
+from imgui_bundle import imgui, implot
 
+from .options import ApplicationOptions
 
 pylog.set_level("debug")
 
