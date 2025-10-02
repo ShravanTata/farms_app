@@ -226,6 +226,10 @@ class BaseExtension(ABC):
         return
 
     @abstractmethod
+    def on_update(self):
+        """ On update called before rendering """
+
+    @abstractmethod
     def cleanup(self) -> None:
         """Clean up resources before shutdown or reload."""
 
@@ -329,6 +333,9 @@ class UIExtension(BaseExtension):
     def after_render(self) -> None:
         """ Steps to perform before calling the renderer """
 
+    def on_update(self):
+        """ On update called before rendering """
+
 
 class WorkflowExtension(BaseExtension):
     """
@@ -373,9 +380,8 @@ class WorkflowExtension(BaseExtension):
     def after_render(self):
         pass
 
-    @abstractmethod
-    def render_window(self):
-        pass
+    def on_update(self):
+        """ On update called before rendering """
 
 
 class CustomExtension(BaseExtension):
@@ -410,6 +416,5 @@ class CustomExtension(BaseExtension):
             )
             window._render()
 
-    @abstractmethod
-    def render_window(self):
-        pass
+    def on_update(self):
+        """ On update called before rendering """

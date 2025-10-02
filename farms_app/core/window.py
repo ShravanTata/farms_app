@@ -61,10 +61,6 @@ class BaseWindow(ABC):
         """ Initialize """
 
     @abstractmethod
-    def on_update(self):
-        """ On update called before rendering """
-
-    @abstractmethod
     def on_render(self):
         """ Render content for the window """
 
@@ -168,9 +164,6 @@ class MainExtensionWindow(BaseWindow):
     def on_initialize(self):
         """ On initialize """
         self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
-
-    def on_update(self):
-        """ On update of the application """
 
     def _render(self):
         """ Internal main render call """
