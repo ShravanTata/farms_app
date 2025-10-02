@@ -320,9 +320,10 @@ class UIExtension(BaseExtension):
     def before_render(self) -> None:
         """ Steps to perform before calling the renderer """
 
-    @abstractmethod
     def render(self) -> None:
         """ Main render """
+        for window in self.windows:
+            window.on_render()
 
     # @abstractmethod
     def after_render(self) -> None:
@@ -389,7 +390,7 @@ class CustomExtension(BaseExtension):
     def __init__(self, name: str):
         # No special data access
         super().__init__(name=name)
-        self.main_window = MainExtensionWindow(self)
+        self.register_window(MainExtensionWindow(self))
 
     def render_menu(self):
         """ Render menu """
@@ -400,11 +401,11 @@ class CustomExtension(BaseExtension):
             return
 
         # Render main window
-        self.main_window._render()
+        # self.main_window._render()
         # Render other associated windows
         for window in self.windows:
             imgui.set_next_window_dock_id(
-                self.main_window.dockspace_id,
+                self.windows[0].dockspace_id,
                 cond=imgui.Cond_.once
             )
             window._render()
