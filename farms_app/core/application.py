@@ -28,12 +28,11 @@ class FARMSApplication:
         self._options = options
 
         # Setup backend
-        self.backend_manager = BackendManager()
         self.backend = None
         self._window = None
         self._io = None
         self._setup_backend(self._options)
-        self.show_metrics_window = False
+        self.show_metrics_window = True
 
         self._run_disable_extension = False
 
@@ -42,22 +41,23 @@ class FARMSApplication:
             str(paths.get_project_root().joinpath(
                 "farms_app", "assets", "fonts", "JetBrainsMono[wght].ttf"
             )),
-            18
+            14
         )
 
-        # Setup plugins
-        self.extension_manager = AppExtensionManager(namespace="farms.app.interface")
-
+        # Setup extensions
+        self.extension_manager = ExtensionManager()
 
     def _setup_backend(self, options: ApplicationOptions):
         """ Setup backend """
         backend_manager = BackendManager()
-        self.backend = backend_manager.create_backend(
-            backend_type="glfw", gl_version=OpenGLVersion.GL2
+        self.backend = backend_manager.initialize(
+            backend_type="glfw",
+            gl_version=OpenGLVersion.GL2
         )
         self.backend.initialize(name=self._options.title)
         self._window = self.backend.window
         self._io = imgui.get_io()
+        return backend_manager
 
     @classmethod
     def from_options(cls, options: ApplicationOptions):
