@@ -6,10 +6,10 @@ from abc import ABC, abstractmethod
 from enum import StrEnum
 from typing import List, Optional
 
+from farms_app.console import console
 from farms_app.core.window import BaseWindow, MainExtensionWindow
 from farms_core import pylog
 from imgui_bundle import imgui
-from rich.console import Console
 from stevedore import EnabledExtensionManager, extension
 
 EXTENSION_NAMESPACE = "farms.app.extension"
@@ -23,8 +23,8 @@ class ExtensionCategory(StrEnum):
 
     - UI: Extensions that contribute user interface elements or interactive components.
 
-    - WORKFLOW: Extensions that define or modify execution flow, processing steps, and
-    can read/write simulation data, add workflow windows.
+    - WORKFLOW: Extensions that define or modify execution flow of FARMS, processing
+    steps, and can read/write simulation data, add workflow windows.
 
     - CUSTOM: Extensions that do not fit into a standard category, often experimental or
     new domains that are outside the core of FARMS.
@@ -44,13 +44,11 @@ class ExtensionManager:
     - Runtime enable/disable
     - Hot-reloading for development
     """
-    console = Console()
 
     def __init__(self, fail_on_load=True):
         super().__init__()
         self.fail_on_load = fail_on_load
         self._enabled_exts: dict[str, EnabledExtension] = {}
-        self._disabled_exts = []
 
         self._mgr = EnabledExtensionManager(
             namespace=EXTENSION_NAMESPACE,
@@ -61,7 +59,7 @@ class ExtensionManager:
     def load_error_cb(self, manager, entry_point, exception):
         pylog.error(f"Could not load extension {entry_point} by {manager}")
         if self.fail_on_load:
-            ExtensionManager.console.print_exception()
+            console.print_exception()
 
     def check_cb(self, ext: extension):
         return (
@@ -86,9 +84,12 @@ class ExtensionManager:
                 obj=_ext.plugin(),
                 category=ExtensionManager._get_type(_ext.plugin)
             )
+            # Move this code to the window manager
+            for window in self._enabled_exts[name].obj.windows:
+                window.initialize()
         except Exception as e:
             pylog.error(f"Failed enabling extension {name} with error: {e}")
-            ExtensionManager.console.print_exception(show_locals=True)
+            console.print_exception(show_locals=True)
             return False
 
     def disable(self, name: str) -> bool:
@@ -100,10 +101,9 @@ class ExtensionManager:
 
         try:
             del self._enabled_exts[name]
-            self._disabled_exts.pop(self._disabled_exts.index(name))
         except Exception as e:
             pylog.error(f"Error in unregister() for module {name}: {e}")
-            ExtensionManager.console.print_exception(show_locals=True)
+            console.print_exception(show_locals=True)
             return False
 
     @staticmethod
