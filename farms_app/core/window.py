@@ -35,6 +35,7 @@ class BaseWindow(ABC):
         self._window_flags: imgui.WindowFlags_ = window_flags
 
         # Window state
+        self._initialized = False
         self._visible: bool = visible
         self._dock_to_extension: bool = dock_to_extension
         self._initialized: bool = False
@@ -55,24 +56,28 @@ class BaseWindow(ABC):
         except Exception as e:
             pylog.error(f"Error initializing window {self._window_id}: {e}")
 
+    @abstractmethod
     def on_initialize(self):
         """ Initialize """
-        pass
 
     @abstractmethod
-    def render_content(self):
+    def on_update(self):
+        """ On update called before rendering """
+
+    @abstractmethod
+    def on_render(self):
         """ Render content for the window """
-        pass
 
     def _render(self):
         """ Internal main render call """
         if imgui.begin(self._window_id, flags=self._window_flags):
-            self.render_content()
+            self.on_render()
         imgui.end()
 
     # Properties for window state management
     @property
     def visible(self) -> bool:
+        """ Get if current window is visible or not """
         return self._visible
 
     @visible.setter
@@ -81,6 +86,7 @@ class BaseWindow(ABC):
 
     @property
     def window_id(self) -> str:
+        """ Get window ID """
         return self._window_id
 
     def show(self):
@@ -151,21 +157,28 @@ class MainExtensionWindow(BaseWindow):
             name=name,
             extension=extension,
             window_flags=window_flags,
-            visible=False,
+            visible=True,
             dock_to_extension=False
         )
         # Create unique dockspace ID for this extension
-        self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
+        self.dockspace_id = None
         # Track docked windows
         self._docked_windows = set()
+
+    def on_initialize(self):
+        """ On initialize """
+        self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
+
+    def on_update(self):
+        """ On update of the application """
 
     def _render(self):
         """ Internal main render call """
         if imgui.begin(self._window_id, flags=self._window_flags):
-            self.render_content()
+            self.on_render()
         imgui.end()
 
-    def render_content(self):
+    def on_render(self):
         """ Render main extension dockspace """
         # Each window gets its own dockspace ID
         imgui.dock_space(
