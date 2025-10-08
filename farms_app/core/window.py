@@ -36,10 +36,8 @@ class BaseWindow(ABC):
         self._window_flags: imgui.WindowFlags_ = window_flags
 
         # Window state
-        self._initialized = False
-        self._visible: bool = visible
-        self._dock_to_extension: bool = dock_to_extension
         self._initialized: bool = False
+        self._visible: bool = visible
         self._should_dock_to_extension: bool = dock_to_extension
 
         # Window properties that can be saved/restored
@@ -66,7 +64,11 @@ class BaseWindow(ABC):
     def on_render(self):
         """ Render content for the window """
 
-    def _render(self):
+    # @abstractmethod
+    # def on_event(self):
+    #     """ Enter on events such as mouse or keyboard """
+
+    def _render(self) -> None:
         """ Internal main render call """
         if imgui.begin(self._window_id, flags=self._window_flags):
             self.on_render()
@@ -79,7 +81,7 @@ class BaseWindow(ABC):
         return self._visible
 
     @visible.setter
-    def visible(self, value: bool):
+    def visible(self, value: bool) -> None:
         self._visible = value
 
     @property
@@ -87,31 +89,31 @@ class BaseWindow(ABC):
         """ Get window ID """
         return self._window_id
 
-    def show(self):
+    def show(self) -> None:
         """Show the window"""
         self._visible = True
 
-    def hide(self):
+    def hide(self) -> None:
         """Hide the window"""
         self._visible = False
 
-    def toggle_visibility(self):
+    def toggle_visibility(self) -> None:
         """Toggle window visibility"""
         self._visible = not self._visible
 
-    def dock_to_extension(self):
+    def dock_to_extension(self) -> None:
         """Dock window back to extension's dockspace"""
         self._should_dock_to_extension = True
 
-    def set_window_flags(self, window_flags: imgui.WindowFlags_):
+    def set_window_flags(self, window_flags: imgui.WindowFlags_) -> None:
         """Set ImGui window flags"""
         self._window_flags = window_flags
 
-    def set_window_size(self, width: float, height: float):
+    def set_window_size(self, width: float, height: float) -> None:
         """Set window size"""
         self._window_size = (width, height)
 
-    def set_window_pos(self, x: float, y: float):
+    def set_window_pos(self, x: float, y: float) -> None:
         """Set window position"""
         self._window_pos = (x, y)
 
@@ -131,15 +133,15 @@ class BaseWindow(ABC):
             'visible': self._visible,
             'size': self._window_size,
             'pos': self._window_pos,
-            'dock_to_extension': self._dock_to_extension
+            'dock_to_extension': self._should_dock_to_extension
         }
 
-    def set_state(self, state: Dict[str, Any]):
+    def set_state(self, state: Dict[str, Any]) -> None:
         """Restore window state from persistence"""
         self._visible = state.get('visible', True)
         self._window_size = state.get('size')
         self._window_pos = state.get('pos')
-        self._dock_to_extension = state.get('dock_to_extension', True)
+        self._should_dock_to_extension = state.get('dock_to_extension', True)
 
 
 class MainExtensionWindow(BaseWindow):
@@ -160,8 +162,6 @@ class MainExtensionWindow(BaseWindow):
         )
         # Create unique dockspace ID for this extension
         self.dockspace_id = None
-        # Track docked windows
-        self._docked_windows = set()
 
     def on_initialize(self):
         """ On initialize """
