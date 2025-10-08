@@ -108,6 +108,9 @@ class FARMSApplication:
         imgui.begin_main_menu_bar()
 
         if imgui.begin_menu("View"):
+            if imgui.menu_item_simple("to-maindock", shortcut=""):
+                for name, ext in self.extension_manager._enabled_exts.items():
+                    ext.obj.dock_all_windows_to_extension()
             if imgui.begin_menu("Theme"):
                 imgui.show_style_selector("Styles")
                 imgui.show_style_editor()
@@ -190,8 +193,8 @@ class FARMSApplication:
             self.backend.begin_frame()
 
             # Render main menu
-            self.render_menu()
             default_main_menu()
+            self.render_menu()
 
             if self.show_metrics_window:
                 imgui.show_metrics_window()
