@@ -17,37 +17,31 @@ class BaseBackend(ABC):
     @abstractmethod
     def initialize(self, name: str, width: int, height: int, **kwargs) -> Any:
         """Initialize the backend and return window handle"""
-        pass
 
     @abstractmethod
     def cleanup(self):
         """Cleanup backend resources"""
-        pass
 
     @abstractmethod
     def begin_frame(self):
         """Begin frame rendering"""
-        pass
 
     @abstractmethod
     def end_frame(self):
         """End frame rendering"""
-        pass
 
     @abstractmethod
     def draw(self, data: "imgui.ImDrawData"):
         """ valid after Render() and until the next call to NewFrame(). this is what you have to render. """
-        pass
 
     @abstractmethod
     def should_close(self) -> bool:
         """Check if window should close"""
-        pass
 
     @abstractmethod
     def poll_events(self):
          """Poll events"""
-         pass
+
     @abstractmethod
     def event_timeout(self, timeout_seconds):
         """ Event timeout """
@@ -59,37 +53,30 @@ class BaseRendererBackend(ABC):
     @abstractmethod
     def initialize(self, name: str, width: int, height: int, **kwargs) -> Any:
         """Initialize the backend and return window handle"""
-        pass
 
     @abstractmethod
     def cleanup(self):
         """Cleanup backend resources"""
-        pass
 
     @abstractmethod
     def begin_frame(self):
         """Begin frame rendering"""
-        pass
 
     @abstractmethod
     def end_frame(self):
         """End frame rendering"""
-        pass
 
     @abstractmethod
     def draw(self, data: "imgui.ImDrawData"):
         """ valid after Render() and until the next call to NewFrame(). this is what you have to render. """
-        pass
 
     @abstractmethod
     def should_close(self) -> bool:
         """Check if window should close"""
-        pass
 
     @abstractmethod
     def poll_events(self):
          """Poll events"""
-         pass
 
 
 class BasePlatformBackend(ABC):
@@ -98,29 +85,23 @@ class BasePlatformBackend(ABC):
     @abstractmethod
     def initialize(self, name: str, width: int, height: int, **kwargs) -> Any:
         """Initialize the backend and return window handle"""
-        pass
 
     @abstractmethod
     def create_window(self, name: str, width: int, height: int, **kwargs) -> bool:
         """ Create a window """
-        pass
 
     @abstractmethod
     def cleanup(self):
         """Cleanup backend resources"""
-        pass
 
     @abstractmethod
     def swap_buffers(self):
         """Cleanup backend resources"""
-        pass
 
     @abstractmethod
     def should_close(self) -> bool:
         """Check if window should close"""
-        pass
 
     @abstractmethod
     def poll_events(self):
          """Poll events"""
-         pass
