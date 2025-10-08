@@ -6,6 +6,7 @@ from typing import List
 import numpy as np
 from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
+from farms_app.backends.base import BaseBackend
 from farms_app.console import console
 from farms_app.core.extension import ExtensionCategory, ExtensionManager
 from farms_app.core.menus import default_main_menu
@@ -29,16 +30,13 @@ class FARMSApplication:
         self._options = options
 
         # Setup backend
-        self.backend = None
-        self._window = None
+        self.backend: BaseBackend = None
         self._io = None
         self._setup_backend(self._options)
         self.show_metrics_window = True
 
-        self._run_disable_extension = False
-
         self.fps_idle = 9.0     # FPS when idling
-        self.enable_idling = True  # a bool to enable/disable idling
+        self.enable_idling = False  # a bool to enable/disable idling
         self.is_idling = False     # an output parameter filled by the runner
 
         # Fonts
@@ -60,7 +58,6 @@ class FARMSApplication:
             gl_version=OpenGLVersion.GL2
         )
         self.backend.initialize(name=self._options.title)
-        self._window = self.backend.window
         self._io = imgui.get_io()
         return backend_manager
 
@@ -91,10 +88,12 @@ class FARMSApplication:
             if extension.category == ExtensionCategory.UI:
                 extension.obj.render()
             elif extension.category == ExtensionCategory.WORKFLOW:
+                extension.obj.update()
+                extension.obj.event()
                 extension.obj.render()
-                extension.obj.on_update()
-                extension.obj.on_event()
             elif extension.category == ExtensionCategory.CUSTOM:
+                extension.obj.update()
+                extension.obj.event()
                 extension.obj.render()
             # render menu
             try:
@@ -168,14 +167,8 @@ class FARMSApplication:
                 if clicked and new_state:
                     self.extension_manager.enable(name)
                 elif clicked and not new_state:
-                    self.extension_manager._disabled_exts.append(name)
-                    self._run_disable_extension = True
+                    self.extension_manager.disable(name)
             imgui.end_menu()
-        # Run this after the menu is closed
-        if self._run_disable_extension:
-            for name in self.extension_manager._disabled_exts:
-                self.extension_manager.disable(name)
-            self._run_disable_extension = False
         imgui.end_main_menu_bar()
 
     def run(self):
