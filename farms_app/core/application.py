@@ -12,6 +12,7 @@ from farms_app.core.menus import default_main_menu
 from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui, implot
+import time
 
 from .options import ApplicationOptions
 
@@ -36,6 +37,10 @@ class FARMSApplication:
 
         self._run_disable_extension = False
 
+        self.fps_idle = 9.0     # FPS when idling
+        self.enable_idling = True  # a bool to enable/disable idling
+        self.is_idling = False     # an output parameter filled by the runner
+
         # Fonts
         self._io.fonts.add_font_from_file_ttf(
             str(paths.get_project_root().joinpath(
@@ -58,6 +63,23 @@ class FARMSApplication:
         self._window = self.backend.window
         self._io = imgui.get_io()
         return backend_manager
+
+    def fps_idling(self):
+        """ Idle fps """
+
+        self.is_idling = False
+        if ((self.fps_idle > 0.0) and self.enable_idling):
+
+            before_wait = time.time_ns()
+            wait_timeout = 1.0 / self.fps_idle
+
+            # Backend specific call that will wait for an event for a maximum duration of waitTimeout
+            self.backend.event_timeout(wait_timeout)
+
+            after_wait = time.time_ns()
+            wait_duration = (after_wait - before_wait)
+            wait_idle_expected = 1.0 / self.fps_idle
+            self.is_idling = (wait_duration > wait_idle_expected * 0.9)
 
     @classmethod
     def from_options(cls, options: ApplicationOptions):
@@ -155,6 +177,10 @@ class FARMSApplication:
         """main run method"""
 
         while not self.backend.should_close():
+
+            # Idling
+            self.fps_idling()
+
             # Poll events
             self.backend.poll_events()
 
