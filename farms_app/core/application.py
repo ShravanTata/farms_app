@@ -92,6 +92,8 @@ class FARMSApplication:
                 extension.obj.render()
             elif extension.category == ExtensionCategory.WORKFLOW:
                 extension.obj.render()
+                extension.obj.on_update()
+                extension.obj.on_event()
             elif extension.category == ExtensionCategory.CUSTOM:
                 extension.obj.render()
             # render menu
