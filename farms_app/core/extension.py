@@ -208,7 +208,7 @@ class BaseExtension(ABC):
         """Dock all windows back to extension dockspace"""
         for window in self.windows:
             if window != self.main_window:
-                window.dock_to_extension()
+                window._should_dock_to_extension = True
 
     #############
     # Lifecycle #
@@ -347,7 +347,7 @@ class WorkflowExtension(BaseExtension):
 
     def __init__(self, name: str):
         super().__init__(name=name)
-        self.main_window = MainExtensionWindow(self)
+        self.register_window(MainExtensionWindow(self))
         self.farms_data = None  # Set by plugin manager
         self.stage: Optional[str] = None
 
@@ -364,17 +364,18 @@ class WorkflowExtension(BaseExtension):
         pass
 
     def render(self):
-        if not self.hide:
+        if self.hide:
             return
 
-        # Render main window
-        self.main_window._render()
         # Render other associated windows
         for window in self.windows:
-            imgui.set_next_window_dock_id(
-                self.main_window.dockspace_id,
-                cond=imgui.Cond_.once
-            )
+            if window.dock_to_extension():
+                # Reset if True
+                window._should_dock_to_extension = False
+                imgui.set_next_window_dock_id(
+                    self.windows[0].dockspace_id,
+                    cond=imgui.Cond_.always
+                )
             window._render()
 
     def after_render(self):
@@ -406,14 +407,15 @@ class CustomExtension(BaseExtension):
         if self.hide:
             return
 
-        # Render main window
-        # self.main_window._render()
         # Render other associated windows
         for window in self.windows:
-            imgui.set_next_window_dock_id(
-                self.windows[0].dockspace_id,
-                cond=imgui.Cond_.once
-            )
+            if window._should_dock_to_extension:
+                # Reset if True
+                window._should_dock_to_extension = False
+                imgui.set_next_window_dock_id(
+                    self.windows[0].dockspace_id,
+                    cond=imgui.Cond_.always
+                )
             window._render()
 
     def on_update(self):
