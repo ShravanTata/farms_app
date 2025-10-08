@@ -48,6 +48,9 @@ class BaseBackend(ABC):
     def poll_events(self):
          """Poll events"""
          pass
+    @abstractmethod
+    def event_timeout(self, timeout_seconds):
+        """ Event timeout """
 
 
 class BaseRendererBackend(ABC):

@@ -120,6 +120,7 @@ class GLFWBackend(BaseBackend):
         io.config_flags |= imgui.ConfigFlags_.nav_enable_keyboard.value
         io.config_flags |= imgui.ConfigFlags_.docking_enable.value
         if platform.system() != "Linux":
+            # Enable viewports only on Mac and Windows
             io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
             io.config_viewports_no_auto_merge = True
             io.config_viewports_no_task_bar_icon = True
@@ -164,6 +165,10 @@ class GLFWBackend(BaseBackend):
         except Exception as e:
             self.cleanup()
             raise pylog.error(f"Backend initialization failed: {e}")
+
+    def event_timeout(self, timeout_seconds):
+        """ Event timeout """
+        glfw.wait_events_timeout(timeout_seconds)
 
     def cleanup(self):
         """Cleanup GLFW resources"""
