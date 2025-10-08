@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from farms_app.extensions.base import BaseExtension
+from farms_app.console import console
 from farms_core import pylog
 from imgui_bundle import imgui
 
@@ -54,6 +55,7 @@ class BaseWindow(ABC):
             self.on_initialize()
             self._initialized = True
         except Exception as e:
+            console.print_exception()
             pylog.error(f"Error initializing window {self._window_id}: {e}")
 
     @abstractmethod
