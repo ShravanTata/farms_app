@@ -1,21 +1,10 @@
 """ Options for FARMS Application """
 
-from enum import StrEnum
-from typing import Any, Dict, Iterable, List, Self, Type, Union
+from enum import Enum
+from typing import Any, Iterable, Self, Type, Union
 
 from farms_app.backends.manager import PlatformType, RendererType
 from farms_core.options import Options
-
-
-class PlatformType(StrEnum):
-    """ Type of Platform """
-    GLFW = 'glfw'
-
-
-class RendererType(StrEnum):
-    """ Type of Renderer """
-    OPENGL2 = 'gl2'
-    OPENGL3 = 'gl3'
 
 
 class BackendOptions(Options):

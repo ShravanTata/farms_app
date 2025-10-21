@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 from farms_core import pylog
@@ -7,12 +7,12 @@ from .base import BaseBackend
 from .glfw_impl import GLFWBackend
 
 
-class PlatformType(StrEnum):
+class PlatformType(str, Enum):
     """ Type of Platform """
     GLFW = 'glfw'
 
 
-class RendererType(StrEnum):
+class RendererType(str, Enum):
     """ Type of Renderer """
     OPENGL2 = 'gl2'
     OPENGL3 = 'gl3'
