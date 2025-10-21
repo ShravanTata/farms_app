@@ -121,16 +121,17 @@ class ExtensionManager:
     def unload(self, name: str) -> bool:
         if name not in self._mgr:
             pylog.error(f"Unknown extension {name} cannot be unloaded")
-            return
-        else:
-            # First disable the extension
-            self.disable_extension(name)
-            # Remove the extension from cache
-            for index, entry_point in list(self._mgr.ENTRY_POINT_CACHE[EXTENSION_NAMESPACE]):
-                if name == entry_point.name:
-                    break
-            self._mgr.ENTRY_POINT_CACHE[EXTENSION_NAMESPACE].pop(index)
-            pylog.debug(f"Removing extension {name} from loaded extensions")
+            return False
+
+        # First disable the extension
+        self.disable(name)
+        # Remove the extension from cache
+        for index, entry_point in list(self._mgr.ENTRY_POINT_CACHE[EXTENSION_NAMESPACE]):
+            if name == entry_point.name:
+                break
+        self._mgr.ENTRY_POINT_CACHE[EXTENSION_NAMESPACE].pop(index)
+        pylog.debug(f"Removing extension {name} from loaded extensions")
+        return True
 
     def render_all(self):
         """Render all enabled extensions and their windows"""
