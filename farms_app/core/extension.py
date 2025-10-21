@@ -340,7 +340,7 @@ class UIExtension(BaseExtension):
     def render(self) -> None:
         """ Main render """
         for window in self.windows:
-            window._render()
+            window.on_render()
 
     # @abstractmethod
     def after_render(self) -> None:
