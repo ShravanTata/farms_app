@@ -226,9 +226,21 @@ class BaseExtension(ABC):
         """Steps to perform after calling the renderer."""
         return
 
+    def update(self):
+        """ Calls the extension update """
+        self.on_update()
+
     @abstractmethod
     def on_update(self):
         """ On update called before rendering """
+
+    def event(self):
+        """ Call the user implemented on_event method """
+        self.on_event()
+
+    @abstractmethod
+    def on_event(self):
+        """ On event """
 
     @abstractmethod
     def cleanup(self) -> None:
@@ -337,6 +349,9 @@ class UIExtension(BaseExtension):
     def on_update(self):
         """ On update called before rendering """
 
+    def on_event(self):
+        """ On event """
+
 
 class WorkflowExtension(BaseExtension):
     """
@@ -385,6 +400,9 @@ class WorkflowExtension(BaseExtension):
     def on_update(self):
         """ On update called before rendering """
 
+    def on_event(self):
+        """ On event """
+
 
 class CustomExtension(BaseExtension):
     """
@@ -421,3 +439,6 @@ class CustomExtension(BaseExtension):
 
     def on_update(self):
         """ On update called before rendering """
+
+    def on_event(self):
+        """ On event """
