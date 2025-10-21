@@ -385,7 +385,7 @@ class WorkflowExtension(BaseExtension):
 
         # Render other associated windows
         for window in self.windows:
-            if window.dock_to_extension():
+            if window._should_dock_to_extension:
                 # Reset if True
                 window._should_dock_to_extension = False
                 imgui.set_next_window_dock_id(
