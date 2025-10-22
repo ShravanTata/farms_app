@@ -71,5 +71,5 @@ farms_app = [
            "assets/**/*"
 ]
 
-[project.entry-points."farms.app.interface"]
+[project.entry-points."farms.app.extension"]
 status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
