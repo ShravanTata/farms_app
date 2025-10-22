@@ -14,3 +14,7 @@ def main():
     app_options = ApplicationOptions(title="FARMS-APP")
     app = FARMSApplication.from_options(app_options)
     app.run()
+
+
+if __name__ == '__main__':
+    main()
