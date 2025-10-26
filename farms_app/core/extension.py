@@ -218,6 +218,9 @@ class BaseExtension(ABC):
         """Steps to perform before calling the renderer."""
         return
 
+    def on_render(self) -> None:
+        """ Called during every render cycle """
+
     @abstractmethod
     def render(self) -> None:
         """Main render loop for this extension."""
@@ -339,6 +342,10 @@ class UIExtension(BaseExtension):
 
     def render(self) -> None:
         """ Main render """
+
+        # Call the user render function
+        self.on_render()
+
         for window in self.windows:
             window.on_render()
 
@@ -383,6 +390,9 @@ class WorkflowExtension(BaseExtension):
         if self.hide:
             return
 
+        # Call the user render function
+        self.on_render()
+
         # Render other associated windows
         for window in self.windows:
             if window._should_dock_to_extension:
@@ -425,6 +435,9 @@ class CustomExtension(BaseExtension):
     def render(self):
         if self.hide:
             return
+
+        # Call the user render function
+        self.on_render()
 
         # Render other associated windows
         for window in self.windows:
