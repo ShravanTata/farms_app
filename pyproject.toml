@@ -73,3 +73,5 @@ farms_app = [
 
 [project.entry-points."farms.app.extension"]
 status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
+debug = "farms_app.extensions.ui.logger:DebugExtension"
+mujoco = "farms_app.extensions.custom.mujoco_impl:MujocoExtension"
