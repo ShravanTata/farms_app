@@ -175,6 +175,8 @@ class MainExtensionWindow(BaseWindow):
 
     def on_render(self):
         """ Render main extension dockspace """
+        # Render the extension menu
+        self._extension.render_menu()
         # Each window gets its own dockspace ID
         imgui.dock_space(
             self.dockspace_id,
