@@ -1,6 +1,5 @@
 """ MuJoCo """
 
-
 import ctypes
 
 import mujoco
@@ -9,8 +8,9 @@ import OpenGL.GL as GL  # type: ignore
 from farms_core import pylog
 from imgui_bundle import imgui
 
-from farms_app.extensions.base import CustomExtension
+from farms_app.core.extension import CustomExtension
 from imgui_bundle import portable_file_dialogs as pfd
+from farms_app.core.window import BaseWindow
 
 
 MJ_IMGUI_KEYMAP = {
@@ -44,24 +44,31 @@ _mjGEOMSTRING = (
 )
 
 
-class MujocoExtension(CustomExtension):
-    """ MuJoCo """
+class MuJoCoWindow(BaseWindow):
+    """ MuJoCo Window """
 
-    def __init__(self):
-        self.show_window = True
-        self.window_name = "MuJoCo"
+    def __init__(self, extension):
+        name: str = "MuJoCo"
+        super().__init__(name, extension)
         self._io = imgui.get_io()
-        self.performance_warnings = []
-
         self.model = None
         self.data = None
 
+    def on_initialize(self):
+        """ Initialize """
 
-    def __del__(self):
-        print("Terminating MuJoCo Extension")
-
-    def get_name(self) -> str:
-        return "MuJoCo"
+    def on_render(self):
+        """ Render main extension dockspace """
+        if self.data is not None and self.model is not None:
+            self.run_simulation()
+            imgui.button("Play")
+        else:
+            if imgui.button("Load mjcf"):
+                self.result = pfd.open_file("Load MJCF", default_path="", filters=("*.xml",),).result()
+                if self.result:
+                    self.model = mujoco.MjModel.from_xml_path(self.result[0])
+                    self.data = mujoco.MjData(self.model)
+                    self.setup_simulation()
 
     def setup_simulation(self):
         self.camera = mujoco.MjvCamera()
@@ -127,9 +134,6 @@ class MujocoExtension(CustomExtension):
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
     def resize_framebuffer(self, width, height):
-        self.width = width
-        self.height = height
-
         # Delete old OpenGL resources
         GL.glDeleteTextures([self.texture_id])
         GL.glDeleteRenderbuffers(1, [self.depth_buffer])
@@ -146,9 +150,15 @@ class MujocoExtension(CustomExtension):
         while (self.data.time - self.start_time < 1.0/60.0):
             mujoco.mj_step(self.model, self.data)
 
+        avail = imgui.get_content_region_avail()
+        render_w, render_h = int(avail.x), int(avail.y)
+
         # Bind framebuffer
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
         GL.glViewport(0, 0, self.width, self.height)
+        self.viewport.width = self.width
+        self.viewport.height = self.height
+        # update MuJoCo camera aspect
 
         # Minimal OpenGL setup - let MuJoCo handle lighting
         # GL.glEnable(GL.GL_DEPTH_TEST)
@@ -160,12 +170,8 @@ class MujocoExtension(CustomExtension):
         mujoco.mjv_updateScene(self.model, self.data, self.option, None, self.camera,
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         mujoco.mjr_render(self.viewport, self.scene, self.mj_context)
-        # GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-
-        if imgui.is_window_hovered():
-            self.mouse_iteractions()
-            self.keyboard_interactions()
+        # GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
 
         target_aspect = self.width / self.height
         avail_width, avail_height = imgui.get_content_region_avail()
@@ -182,23 +188,17 @@ class MujocoExtension(CustomExtension):
             draw_width = avail_width
             draw_height = draw_width / target_aspect
 
-        imgui.image(
-            int(self.texture_id),
-            imgui.ImVec2((draw_width, draw_height)),
+        imgui.image_with_bg(
+            imgui.ImTextureRef(self.texture_id),
+            imgui.ImVec2((self.width, self.height)),
             uv0=imgui.ImVec2((1,1)),
             uv1=imgui.ImVec2((0,0)),
-            # border_color=imgui.ImVec4((1, 0, 0, 1))
+            bg_col=imgui.ImVec4((0, 0, 1, 1))
         )
 
-    def render_window(self) -> None:
-        if self.data is not None and self.model is not None:
-            self.run_simulation()
-        else:
-            if imgui.button("Load mjcf"):
-                self.result = pfd.open_file("Load MJCF", default_path="", filters=("*.xml",),).result()
-                self.model = mujoco.MjModel.from_xml_path(self.result[0])
-                self.data = mujoco.MjData(self.model)
-                self.setup_simulation()
+        if imgui.is_item_hovered():
+            self.mouse_iteractions()
+            self.keyboard_interactions()
 
     def __mj_keys(self, mjSTRING: tuple[str, str, str], mj_flags):
         for j, _opt in enumerate(mjSTRING):
@@ -265,3 +265,26 @@ class MujocoExtension(CustomExtension):
                 self.scene,
                 self.camera,
             )
+
+
+class MujocoExtension(CustomExtension):
+    """ MuJoCo """
+
+    def __init__(self):
+        super().__init__(name="MuJoCo")
+        self.hide = False
+
+        # Register windows
+        self.register_window(MuJoCoWindow(self))
+
+    def __del__(self):
+        print("Terminating MuJoCo Extension")
+
+    def get_name(self) -> str:
+        return "MuJoCo"
+
+    def cleanup(self):
+        pass
+
+    def get_dependencies(self):
+        pass
