@@ -189,7 +189,7 @@ class MuJoCoWindow(BaseWindow):
             draw_height = draw_width / target_aspect
 
         imgui.image_with_bg(
-            imgui.ImTextureRef(self.texture_id),
+            self.texture_id,
             imgui.ImVec2((self.width, self.height)),
             uv0=imgui.ImVec2((1,1)),
             uv1=imgui.ImVec2((0,0)),
