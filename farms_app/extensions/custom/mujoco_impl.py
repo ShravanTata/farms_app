@@ -4,7 +4,6 @@ import ctypes
 
 import mujoco
 import numpy as np
-from OpenGL import EGL
 import OpenGL.GL as GL  # type: ignore
 from farms_core import pylog
 from imgui_bundle import imgui
@@ -12,16 +11,6 @@ from imgui_bundle import imgui
 from farms_app.core.extension import CustomExtension
 from imgui_bundle import portable_file_dialogs as pfd
 from farms_app.core.window import BaseWindow
-
-
-def safe_get_bound_fbo():
-    try:
-        surf = EGL.eglGetCurrentSurface(EGL.EGL_DRAW)
-        if surf == EGL.EGL_NO_SURFACE:
-            return None
-        return int(GL.glGetIntegerv(GL.GL_DRAW_FRAMEBUFFER_BINDING))
-    except GL.GLError:
-        return None
 
 
 MJ_IMGUI_KEYMAP = {
@@ -165,7 +154,6 @@ class MuJoCoWindow(BaseWindow):
         render_w, render_h = int(avail.x), int(avail.y)
 
         # Bind framebuffer
-        prev_fbo = safe_get_bound_fbo()
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
         GL.glViewport(0, 0, self.width, self.height)
         self.viewport.width = self.width
@@ -182,10 +170,11 @@ class MuJoCoWindow(BaseWindow):
         mujoco.mjv_updateScene(self.model, self.data, self.option, None, self.camera,
                               mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         mujoco.mjr_render(self.viewport, self.scene, self.mj_context)
-        if prev_fbo:
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, prev_fbo)
-        # GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
-
+        try:
+            # Exception handling necessary for Nvidia + Wayland
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        except GL.GLError:
+            pass
         target_aspect = self.width / self.height
         avail_width, avail_height = imgui.get_content_region_avail()
         if avail_width <= 0 or avail_height <= 0:
