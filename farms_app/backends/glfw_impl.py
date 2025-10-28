@@ -204,9 +204,6 @@ class GLFWBackend(BaseBackend):
         io = imgui.get_io()
 
         imgui.render()
-        width, height = glfw.get_framebuffer_size(self.window)
-        GL.glViewport(0, 0, width, height)
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
         major, minor, _ = self._determine_gl_version()
         if major >= 3:
