@@ -95,12 +95,6 @@ class FARMSApplication:
                 extension.obj.update()
                 extension.obj.event()
                 extension.obj.render()
-            # render menu
-            try:
-                if extension.obj.is_focused:
-                    extension.obj.render_menu()
-            except:
-                pass
 
     def render_menu(self):
         """ Render menu """
