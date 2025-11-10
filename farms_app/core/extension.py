@@ -376,12 +376,7 @@ class WorkflowExtension(BaseExtension):
 
     def render_menu(self):
         """ Render menu """
-        imgui.begin_main_menu_bar()
-
-        if imgui.begin_menu(f"{self.name}"):
-            imgui.text("Hello")
-            imgui.end_menu()
-        imgui.end_main_menu_bar()
+        pass
 
     def before_render(self):
         pass
