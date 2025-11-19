@@ -4,8 +4,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from farms_app.extensions.base import BaseExtension
 from farms_app.console import console
+from farms_app.extensions.base import BaseExtension
 from farms_core import pylog
 from imgui_bundle import imgui
 
@@ -31,7 +31,7 @@ class BaseWindow(ABC):
 
         self.name: str = name
         self._extension: BaseExtension = extension
-        # Check if the window name already exists in  the extension
+        # Check if the window name already exists in the extension
         self._window_id: str = self.create_window_id(self._extension.name, self.name)
         self._window_flags: imgui.WindowFlags_ = window_flags
 
