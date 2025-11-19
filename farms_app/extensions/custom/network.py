@@ -3,17 +3,17 @@
 import time
 from argparse import ArgumentParser
 
+import networkx as nx
 import numpy as np
-from farms_app.plugins.base import BasePlugin
+from farms_app.core.extension import CustomExtension
+from farms_app.core.window import BaseWindow
 from farms_core import pylog
 from farms_core.io.yaml import read_yaml
 from farms_network.core.network import Network
 from farms_network.core.options import NetworkOptions
-from scipy.integrate import ode
-
 from imgui_bundle import imgui, imgui_ctx, implot, implot3d
 from tqdm import tqdm
-import networkx as nx
+from farms_app.utils import colors
 
 
 def rotate(vector, theta):
@@ -673,137 +673,331 @@ def draw_play_pause_button(button_state):
     return button_state
 
 
-class NetworkPlugin(BasePlugin):
+class DiagramStyle:
+    node_radius = 12
+    node_shadow_offset = (3, 3)
+    node_shadow_alpha = 0.18
+    node_highlight_alpha = 0.25
+    curve_thickness = 3.0
+    arrow_size = 8.0
+    node_border_thickness = 2.3
+
+    # colors
+    col_node_blue = (0.68, 0.80, 1.0, 1.0)
+    col_node_red = (1.0, 0.78, 0.78, 1.0)
+    col_border_dark = (0.22, 0.22, 0.32, 1.0)
+    col_edge = (0.18, 0.18, 0.18, 1.0)
+    col_shadow = (0.0, 0.0, 0.0)
+    col_highlight = (1.0, 1.0, 1.0)
+
+style = DiagramStyle()
+
+
+def col32(rgba):
+    return imgui.color_convert_float4_to_u32(rgba)
+
+
+class NetworkExtension(CustomExtension):
     """ Network """
 
     def __init__(self):
-        self.show_window = True
+        name = "Network"
+        super().__init__(name=name)
 
-        # run network
-        self.network_options = NetworkOptions.from_options(
-            read_yaml("/tmp/network_options.yaml")
-            # read_yaml("/Users/tatarama/projects/work/farms/farms_network/examples/mouse/config/central_network.yaml")
+        network_options = NetworkOptions.from_options(
+            read_yaml("/tmp/network.yaml")
         )
 
-        self.network = Network.from_options(self.network_options)
-        self.network.setup_integrator(self.network_options)
+        self.network = Network.from_options(network_options)
+        self.network.setup_integrator()
+        self.time = 0.0
 
-        # Integrate
-        self.N_ITERATIONS = self.network_options.integration.n_iterations
-        self.TIMESTEP = self.network_options.integration.timestep
-        self.BUFFER_SIZE = self.network_options.logs.buffer_size
+        # # Integrate
+        # self.N_ITERATIONS = self.network_options.integration.n_iterations
+        # self.TIMESTEP = self.network_options.integration.timestep
+        # self.BUFFER_SIZE = self.network_options.logs.buffer_size
 
-        self.inputs_view = self.network.data.external_inputs.array
-        self.drive_input = 0.0
+        # self.inputs_view = self.network.data.external_inputs.array
+        # self.drive_input = 0.0
 
-        edges_xy = np.array(
-            [
-                self.network_options.nodes[node_idx].visual.position[:2]
-                for edge in self.network_options.edges
-                for node_idx in (
-                        self.network_options.nodes.index(edge.source),
-                        self.network_options.nodes.index(edge.target),
-                )
-            ]
-        )
-        # for index in range(len(edges_xy) - 1):
-        #     edges_xy[index], edges_xy[index + 1] = connect_positions(
-        #         edges_xy[index+1], edges_xy[index], 0.1, 0.0
-        #     )
-        self.edges_x = np.array(edges_xy[:, 0])
-        self.edges_y = np.array(edges_xy[:, 1])
+        # edges_xy = np.array(
+        #     [
+        #         self.network_options.nodes[node_idx].visual.position[:2]
+        #         for edge in self.network_options.edges
+        #         for node_idx in (
+        #                 self.network_options.nodes.index(edge.source),
+        #                 self.network_options.nodes.index(edge.target),
+        #         )
+        #     ]
+        # )
+        # # for index in range(len(edges_xy) - 1):
+        # #     edges_xy[index], edges_xy[index + 1] = connect_positions(
+        # #         edges_xy[index+1], edges_xy[index], 0.1, 0.0
+        # #     )
+        # self.edges_x = np.array(edges_xy[:, 0])
+        # self.edges_y = np.array(edges_xy[:, 1])
 
-        fps = 30.0
-        _time_draw = time.time()
-        _time_draw_last = _time_draw
-        _realtime = 0.1
+        # fps = 30.0
+        # _time_draw = time.time()
+        # _time_draw_last = _time_draw
+        # _realtime = 0.1
 
-        io = imgui.get_io()
+        # io = imgui.get_io()
 
-        self.alpha_input_indices = [
+        # self.alpha_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "input" in node.name and node.model == "external_relay"
+        # ]
+        # self.drive_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "DR" in node.name and node.model == "linear"
+        # ]
+        # self.Ia_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "Ia" == node.name[-2:]
+        # ]
+        # self.II_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "II" == node.name[-2:]
+        # ]
+        # self.Ib_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "Ib" == node.name[-2:]
+        # ]
+        # self.Vn_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "Vn" == node.name[-2:] and node.model == "external_relay"
+        # ]
+        # self.Cut_input_indices = [
+        #     index
+        #     for index, node in enumerate(self.network_options.nodes)
+        #     if "cut" == node.name[-3:] and node.model == "external_relay"
+        # ]
+        # self.slider_values = np.zeros((7,))
+        # self.slider_values[0] = 1.0
+        # self.input_array = np.zeros(np.shape(self.inputs_view))
+        # self.input_array[self.alpha_input_indices] = 1.0
+        # self.button_state = False2
+        # # input_array[drive_input_indices[0]] *= 1.05
+        # for index, node in enumerate(self.network_options.nodes):
+        #     if "BS_DR" in node.name and node.model == "linear":
+        #         bs_dr = index
+        # self.iteration = 0
+        # self.buffer_iteration = 0
+        self.drive_index = [
             index
-            for index, node in enumerate(self.network_options.nodes)
-            if "input" in node.name and node.model == "external_relay"
-        ]
-        self.drive_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "DR" in node.name and node.model == "linear"
-        ]
-        self.Ia_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "Ia" == node.name[-2:]
-        ]
-        self.II_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "II" == node.name[-2:]
-        ]
-        self.Ib_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "Ib" == node.name[-2:]
-        ]
-        self.Vn_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "Vn" == node.name[-2:] and node.model == "external_relay"
-        ]
-        self.Cut_input_indices = [
-            index
-            for index, node in enumerate(self.network_options.nodes)
-            if "cut" == node.name[-3:] and node.model == "external_relay"
-        ]
-        self.slider_values = np.zeros((7,))
-        self.slider_values[0] = 1.0
-        self.input_array = np.zeros(np.shape(self.inputs_view))
-        self.input_array[self.alpha_input_indices] = 1.0
-        self.button_state = False
-        # input_array[drive_input_indices[0]] *= 1.05
-        for index, node in enumerate(self.network_options.nodes):
-            if "BS_DR" in node.name and node.model == "linear":
-                bs_dr = index
-        self.iteration = 0
-        self.buffer_iteration = 0
+            for index, node in enumerate(network_options.nodes)
+            if "BS_input" in node.name and node.model == "relay"
+        ][0]
+
+        self.register_window(NetworkVisualizerWindow(self))
+
+    def on_update(self):
+        self.network.data.external_inputs.array[self.drive_index] = 0.5
+        self.network.step(self.time)
+        self.network.update_logs(self.time)
+        self.time += 1
 
     def get_name(self) -> str:
         return "Network"
 
-    def render(self) -> None:
-        if not self.show_window:
-            return
+    def cleanup(self):
+        """ Cleanup  """
+        pass
 
-        expanded, self.show_window = imgui.begin("Network", self.show_window)
+    def get_dependencies(self):
+        return []
 
-        self.input_array[self.alpha_input_indices] = self.slider_values[0]
-        self.input_array[self.drive_input_indices] = self.slider_values[1]
-        self.input_array[self.Ia_input_indices] = self.slider_values[2]
-        self.input_array[self.II_input_indices] = self.slider_values[3]
-        self.input_array[self.Ib_input_indices] = self.slider_values[4]
-        self.input_array[self.Vn_input_indices] = self.slider_values[5]
-        self.input_array[self.Cut_input_indices] = self.slider_values[6]
+    # def render(self) -> None:
+    #     if not self.show_window:
+    #         return
 
-        self.inputs_view[:] = self.input_array
-        self.network.step()
-        self.iteration += 1
-        self.buffer_iteration = self.iteration%self.BUFFER_SIZE
-        self.network.data.times.array[self.buffer_iteration] = (self.iteration)*self.TIMESTEP
-        implot.push_style_var(implot.StyleVar_.line_weight, 2.0)
-        self.slider_values = draw_slider(label="d", name="Drive", values=self.slider_values)
-        add_plot(self.buffer_iteration, self.network.data)
-        # button_state = draw_play_pause_button(button_state)
-        draw_table(self.network_options, self.network.data)
-        draw_network(self.network_options, self.network.data, self.buffer_iteration, self.edges_x, self.edges_y)
-        plot_hind_motor_activity(self.buffer_iteration, self.network.data)
-        plot_fore_motor_activity(self.buffer_iteration, self.network.data)
-        # draw_vn_activity(self.buffer_iteration, network.data)
-        implot.pop_style_var()
+    #     expanded, self.show_window = imgui.begin("Network", self.show_window)
 
-        imgui.end()
+    #     self.input_array[self.alpha_input_indices] = self.slider_values[0]
+    #     self.input_array[self.drive_input_indices] = self.slider_values[1]
+    #     self.input_array[self.Ia_input_indices] = self.slider_values[2]
+    #     self.input_array[self.II_input_indices] = self.slider_values[3]
+    #     self.input_array[self.Ib_input_indices] = self.slider_values[4]
+    #     self.input_array[self.Vn_input_indices] = self.slider_values[5]
+    #     self.input_array[self.Cut_input_indices] = self.slider_values[6]
+
+    #     self.inputs_view[:] = self.input_array
+    #     self.network.step()
+    #     self.iteration += 1
+    #     self.buffer_iteration = self.iteration%self.BUFFER_SIZE
+    #     self.network.data.times.array[self.buffer_iteration] = (self.iteration)*self.TIMESTEP
+    #     implot.push_style_var(implot.StyleVar_.line_weight, 2.0)
+    #     self.slider_values = draw_slider(label="d", name="Drive", values=self.slider_values)
+    #     add_plot(self.buffer_iteration, self.network.data)
+    #     # button_state = draw_play_pause_button(button_state)
+    #     draw_table(self.network_options, self.network.data)
+    #     draw_network(self.network_options, self.network.data, self.buffer_iteration, self.edges_x, self.edges_y)
+    #     plot_hind_motor_activity(self.buffer_iteration, self.network.data)
+    #     plot_fore_motor_activity(self.buffer_iteration, self.network.data)
+    #     # draw_vn_activity(self.buffer_iteration, network.data)
+    #     implot.pop_style_var()
+
+    #     imgui.end()
 
 
-class NetworkVisualPlugin(BasePlugin):
+class NetworkVisualizerWindow(BaseWindow):
+
+    def __init__(self, extension, network: Network = None):
+        name: str = "visualizer"
+        super().__init__(name, extension)
+
+    def on_initialize(self):
+        """ On initialize """
+        self.network = self._extension.network
+
+        self.edges_p1p2 = [
+          (
+            self.network.options.nodes[self.network.options.nodes.index(edge.source)].visual['position'][:2],
+            self.network.options.nodes[self.network.options.nodes.index(edge.target)].visual['position'][:2],
+          )
+          for edge in self.network.options.edges
+        ]
+
+        edges_xy = np.array(
+            [
+                self.network.options.nodes[node_idx].visual['position'][:2]
+                for edge in self.network.options.edges
+                for node_idx in (
+                        self.network.options.nodes.index(edge.source),
+                        self.network.options.nodes.index(edge.target),
+                )
+            ]
+        )
+        for index in range(len(edges_xy) - 1):
+            edges_xy[index], edges_xy[index + 1] = connect_positions(
+                edges_xy[index+1], edges_xy[index], 0.5, 0.0
+            )
+        self.edges_x = np.array(edges_xy[:, 0])
+        self.edges_y = np.array(edges_xy[:, 1])
+
+    def draw_node2(self, draw_list, pos, radius, color_fill):
+      r = style.node_radius
+      shadow_dx, shadow_dy = style.node_shadow_offset
+
+      # Color conversion
+      col_fill = color_fill
+      col_border = col32(style.col_border_dark)
+      col_shadow = col32((*style.col_shadow, style.node_shadow_alpha))
+      col_highlight = col32((*style.col_highlight, style.node_highlight_alpha))
+
+      # soft shadow
+      draw_list.add_circle_filled(
+          (pos[0] + shadow_dx, pos[1] + shadow_dy),
+          r + 3,
+          col_shadow
+      )
+
+      # fill
+      draw_list.add_circle_filled(pos, r, col_fill)
+
+      # border
+      draw_list.add_circle(pos, r, col_border, 40, style.node_border_thickness)
+
+      # internal highlight (upper-left)
+      draw_list.add_circle_filled(
+          (pos[0] - 3, pos[1] - 3),
+          r * 0.55,
+          col_highlight
+      )
+
+    def draw_bezier_connection(self, draw_list, color):
+      # soft cubic curve
+      for p1, p2 in self.edges_p1p2:
+        p1 = implot.plot_to_pixels(p1)
+        p2 = implot.plot_to_pixels(p2)
+
+        dx = (p2[0] - p1[0]) * 0.5
+        cp1 = (p1[0] + dx, p1[1])
+        cp2 = (p2[0] - dx, p2[1])
+        draw_list.add_bezier_cubic(
+            p1, cp1, cp2, p2,
+            color, thickness=2.5
+        )
+
+    def on_update(self):
+        """ On update of the application """
+
+    def on_render(self):
+        """ Render main extension dockspace """
+        imgui.text("Inside a dock host")
+        self.draw_network()
+
+    def draw_network(self):
+      nodes = self.network.options.nodes
+      edges = self.network.options.edges
+      flags = (
+          implot.AxisFlags_.no_label |
+          implot.AxisFlags_.no_tick_labels |
+          implot.AxisFlags_.no_tick_marks
+      )
+      if implot.begin_plot("vis", size=(-1, -1), flags=implot.Flags_.equal):
+
+          implot.setup_axis(implot.ImAxis_.x1, flags=flags)
+          implot.setup_axis(implot.ImAxis_.y1, flags=flags)
+          # implot.plot_line(
+          #     "",
+          #     xs=self.edges_x,
+          #     ys=self.edges_y,
+          #     flags=implot.LineFlags_.segments
+          # )
+          # radius = 0.1
+          # circ_x = radius*np.cos(np.linspace(-np.pi, np.pi, 50))
+          # circ_y = radius*np.sin(np.linspace(-np.pi, np.pi, 50))
+
+          draw_list = implot.get_plot_draw_list()
+          implot.push_plot_clip_rect()
+          # safe to draw, nothing leaks outside plot
+          self.draw_bezier_connection(draw_list, colors.COLORS['edge'])
+          implot.pop_plot_clip_rect()
+
+          for index, node in enumerate(nodes):
+              p1 = implot.plot_to_pixels(node.visual['position'][:2])
+
+              implot.push_plot_clip_rect()
+              # safe to draw, nothing leaks outside plot
+              self.draw_node2(
+                  draw_list, p1, 20, colors.rgb_u32(
+                      *colors._RAW_COLORS['pastel_yellow'],
+                      a=10*255*self.network.data.outputs.array[index])
+              )
+              draw_list.add_text(p1, colors.COLORS['edge'], node.visual['label'].replace("\\textsubscript", "")[0])
+              implot.pop_plot_clip_rect()
+            # implot.set_next_marker_style(size=15.0) # *node.vi3sual.radius
+            # implot.push_style_var(implot.StyleVar_.fill_alpha, self.network.data.outputs.array[index])
+            # implot.plot_scatter(
+            #     "##",
+            #     xs=np.array((node.visual['position'][0],)),
+            #     ys=np.array((node.visual['position'][1],)),
+            # )
+            # implot.pop_style_var()
+            # implot.set_next_marker_style(size=8.0) # *node.vi3sual.radius
+            # implot.plot_scatter(
+            #     "##",
+            #     xs=np.array((node.visual['position'][0],)),
+            #     ys=np.array((node.visual['position'][1],)),
+            # )
+            # implot.plot_text(
+            #     node.visual['label'].replace("\\textsubscript", "")[0],
+            #     node.visual['position'][0],
+            #     node.visual['position'][1],
+            # )
+
+          implot.end_plot()
+
+
+class NetworkVisualExtension(CustomExtension):
     """ Network """
 
     def __init__(self):
@@ -813,7 +1007,7 @@ class NetworkVisualPlugin(BasePlugin):
         # run network
         self.network_options = NetworkOptions.from_options(
             # read_yaml("/Users/tatarama/projects/work/farms/farms_network/examples/mouse/config/central_network.yaml")
-            read_yaml("/tmp/network_options.yaml")
+            read_yaml("/tmp/network.yaml")
         )
 
         edges_xy = np.array(
@@ -830,7 +1024,7 @@ class NetworkVisualPlugin(BasePlugin):
         self.edges_y = np.array(edges_xy[:, 1])
 
         self.graph = nx.node_link_graph(
-            self.network_options,
+            self.network.options,
             directed=True,
             multigraph=False,
             link="edges",
@@ -853,74 +1047,78 @@ class NetworkVisualPlugin(BasePlugin):
             implot.AxisFlags_.no_tick_labels |
             implot.AxisFlags_.no_tick_marks
         )
-        if implot.begin_plot("vis", flags=implot.Flags_.equal):
-            implot.setup_axis(implot.ImAxis_.x1, flags=flags)
-            implot.setup_axis(implot.ImAxis_.y1, flags=flags)
-            implot.plot_line(
-                "",
-                xs=self.edges_x,
-                ys=self.edges_y,
-                flags=implot.LineFlags_.segments
-            )
-            radius = 0.1
-            circ_x = radius*np.cos(np.linspace(-np.pi, np.pi, 50))
-            circ_y = radius*np.sin(np.linspace(-np.pi, np.pi, 50))
-            for index, node in enumerate(nodes):
-                implot.set_next_marker_style(
-                    size=10.0 # *node.vi3sual.radius
+        if imgui.begin_child("Network", size=(-1, -1), child_flags=imgui.ChildFlags_.resize_x | imgui.ChildFlags_.resize_y | imgui.ChildFlags_.borders):
+            if implot.begin_plot("vis", size=(-1, -1), flags=implot.Flags_.equal):
+                implot.setup_axis(implot.ImAxis_.x1, flags=flags)
+                implot.setup_axis(implot.ImAxis_.y1, flags=flags)
+                implot.plot_line(
+                    "",
+                    xs=self.edges_x,
+                    ys=self.edges_y,
+                    flags=implot.LineFlags_.segments
                 )
-                implot.push_style_var(implot.StyleVar_.fill_alpha, 1.0)
-                implot.plot_scatter(
-                    "##",
-                    xs=np.array((node.visual.position[0],)),
-                    ys=np.array((node.visual.position[1],)),
-                )
-                # implot.plot_line(
-                #     "##",
-                #     node.visual.position[0]+circ_x,
-                #     node.visual.position[1]+circ_y
-                # )
-                implot.pop_style_var()
-                # implot.push_plot_clip_rect()
-                # position = implot.plot_to_pixels(implot.Point(node.visual.position[:2]))
-                # radius = implot.plot_to_pixels(0.001, 0.001)
-                # color = imgui.IM_COL32(255, 0, 0, 255)
-                # implot.get_plot_draw_list().add_circle(position, radius[0], color)
-                # implot.pop_plot_clip_rect()
+                radius = 0.1
+                circ_x = radius*np.cos(np.linspace(-np.pi, np.pi, 50))
+                circ_y = radius*np.sin(np.linspace(-np.pi, np.pi, 50))
+                for index, node in enumerate(nodes):
+                    implot.set_next_marker_style(
+                        size=10.0 # *node.vi3sual.radius
+                    )
+                    implot.push_style_var(implot.StyleVar_.fill_alpha, 1.0)
+                    implot.plot_scatter(
+                        "##",
+                        xs=np.array((node.visual.position[0],)),
+                        ys=np.array((node.visual.position[1],)),
+                    )
+                    # implot.plot_line(
+                    #     "##",
+                    #     node.visual.position[0]+circ_x,
+                    #     node.visual.position[1]+circ_y
+                    # )
+                    implot.pop_style_var()
+                    # implot.push_plot_clip_rect()
+                    # position = implot.plot_to_pixels(implot.Point(node.visual.position[:2]))
+                    # radius = implot.plot_to_pixels(0.001, 0.001)
+                    # color = imgui.IM_COL32(255, 0, 0, 255)
+                    # implot.get_plot_draw_list().add_circle(position, radius[0], color)
+                    # implot.pop_plot_clip_rect()
 
-                # implot.push_plot_clip_rect()
-                # color = imgui.IM_COL32(
-                #     100, 185, 0,
-                #     int(255*(data.nodes[index].output[iteration]))
-                # )
-                # implot.get_plot_draw_list().add_circle_filled(position, 7.5, color)
-                # implot.pop_plot_clip_rect()
-                implot.plot_text(
-                    node.visual.label.replace("\\textsubscript", "")[0],
-                    node.visual.position[0],
-                    node.visual.position[1],
-                )
+                    # implot.push_plot_clip_rect()
+                    # color = imgui.IM_COL32(
+                    #     100, 185, 0,
+                    #     int(255*(data.nodes[index].output[iteration]))
+                    # )
+                    # implot.get_plot_draw_list().add_circle_filled(position, 7.5, color)
+                    # implot.pop_plot_clip_rect()
+                    implot.plot_text(
+                        node.visual.label.replace("\\textsubscript", "")[0],
+                        node.visual.position[0],
+                        node.visual.position[1],
+                    )
 
-            implot.end_plot()
+                implot.end_plot()
+            imgui.end_child()
 
     def draw_connectivity_map(self):
         """ Draw connectivity """
         axes_flags = implot.AxisFlags_.lock | implot.AxisFlags_.no_grid_lines | implot.AxisFlags_.no_tick_marks
         implot.push_colormap(implot.Colormap_.viridis)
-        if implot.begin_plot("Connectivity", flags=implot.Flags_.no_legend | implot.Flags_.no_mouse_text):
-            implot.setup_axes("", "", axes_flags, axes_flags)
-            implot.setup_axis_ticks(implot.ImAxis_.x1, values=[j for j in range(10)], labels=[f"{j}" for j in range(10)], keep_default=False)
-            implot.setup_axis_ticks(implot.ImAxis_.y1, values=[j for j in range(10)], labels=[f"{j}" for j in range(10)], keep_default=False)
-            implot.plot_heatmap(
-                "network", self.sparse_array.todense(), label_fmt="%i"
-            )
-            implot.end_plot()
+        if imgui.begin_child("Network", size=(-1, -1), child_flags=imgui.ChildFlags_.resize_x | imgui.ChildFlags_.resize_y):
+            if implot.begin_plot("Connectivity", flags=implot.Flags_.no_legend | implot.Flags_.no_mouse_text):
+                # implot.setup_axes("", "", axes_flags, axes_flags)
+                implot.setup_axis_ticks(implot.ImAxis_.x1, values=[j for j in range(10)], labels=[f"{j}" for j in range(10)], keep_default=False)
+                implot.setup_axis_ticks(implot.ImAxis_.y1, values=[j for j in range(10)], labels=[f"{j}" for j in range(10)], keep_default=False)
+                implot.plot_heatmap(
+                    "network", self.sparse_array.todense(), label_fmt="%i"
+                )
+                implot.end_plot()
+            imgui.end_child()
         implot.pop_colormap()
 
 
     def get_name(self) -> str:
         return "Network"
 
-    def render(self) -> None:
+    def render_window(self) -> None:
         self.draw_network()
-        self.draw_connectivity_map()
+        # self.draw_connectivity_map()
