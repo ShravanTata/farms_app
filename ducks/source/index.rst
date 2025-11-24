@@ -10,15 +10,13 @@
 .. warning:: Farmers are currently busy! Documentation is work in progress!!
 
 
-=============
- Introduction
-=============
-
 Contents
 
 .. toctree::
+   :hidden:
 
-   introduction/index.rst
+   overview
+   introduction
    core/index.rst
 
 .. sidebar-links::
