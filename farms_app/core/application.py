@@ -112,30 +112,30 @@ class FARMSApplication:
                 for name, extension in self.extension_manager._enabled_exts.items():
                     if extension.category == ExtensionCategory.UI:
                         clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.show_window
+                            name, shortcut="", p_selected=extension.obj.hide
                         )
                         if clicked:
-                            extension.obj.show_window = new_state
+                            extension.obj.hide = new_state
                 imgui.end_menu()
             imgui.separator()
             if imgui.begin_menu("Workflow"):
                 for name, extension in self.extension_manager._enabled_exts.items():
                     if extension.category == ExtensionCategory.WORKFLOW:
                         clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.show_window
+                            name, shortcut="", p_selected=extension.obj.hide
                         )
                         if clicked:
-                            extension.obj.show_window = new_state
+                            extension.obj.hide = new_state
                 imgui.end_menu()
             imgui.separator()
             if imgui.begin_menu("Custom"):
                 for name, extension in self.extension_manager._enabled_exts.items():
                     if extension.category == ExtensionCategory.CUSTOM:
                         clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.show_window
+                            name, shortcut="", p_selected=extension.obj.hide
                         )
                         if clicked:
-                            extension.obj.show_window = new_state
+                            extension.obj.hide = new_state
                 imgui.end_menu()
             imgui.end_menu()
 
