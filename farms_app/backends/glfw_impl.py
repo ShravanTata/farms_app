@@ -121,7 +121,7 @@ class GLFWBackend(BaseBackend):
         io.config_flags |= imgui.ConfigFlags_.docking_enable.value
         if platform.system() != "Linux":
             # Enable viewports only on Mac and Windows
-            io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
+            # io.config_flags |= imgui.ConfigFlags_.viewports_enable.value
             io.config_viewports_no_auto_merge = True
             io.config_viewports_no_task_bar_icon = True
 
