@@ -351,7 +351,8 @@ class UIExtension(BaseExtension):
         self.on_render()
 
         for window in self.windows:
-            window.on_render()
+            if window._initialized:
+                window.on_render()
 
     # @abstractmethod
     def after_render(self) -> None:
@@ -406,14 +407,15 @@ class WorkflowExtension(BaseExtension):
 
         # Render other associated windows
         for window in self.windows:
-            if window._should_dock_to_extension:
-                # Reset if True
-                window._should_dock_to_extension = False
-                imgui.set_next_window_dock_id(
-                    self.windows[0].dockspace_id,
-                    cond=imgui.Cond_.always
-                )
-            window._render()
+            # if window._should_dock_to_extension:
+            #     # Reset if True
+            #     window._should_dock_to_extension = False
+            #     imgui.set_next_window_dock_id(
+            #         self.windows[0].dockspace_id,
+            #         cond=imgui.Cond_.always
+            #     )
+            if window._initialized:
+                window._render()
 
     def after_render(self):
         pass
@@ -456,14 +458,18 @@ class CustomExtension(BaseExtension):
 
         # Render other associated windows
         for window in self.windows:
-            if window._should_dock_to_extension:
-                # Reset if True
-                window._should_dock_to_extension = False
-                imgui.set_next_window_dock_id(
-                    self.windows[0].dockspace_id,
-                    cond=imgui.Cond_.always
-                )
-            window._render()
+            # if window._should_dock_to_extension:
+            #     # Reset if True
+            #     window._should_dock_to_extension = False
+            #     imgui.set_next_window_dock_id(
+            #         self.windows[0].dockspace_id,
+            #         cond=imgui.Cond_.always
+            #     )
+            if window._initialized:
+                window._render()
+
+    def after_render(self):
+        """ after render """
 
     def on_update(self):
         """ On update called before rendering """

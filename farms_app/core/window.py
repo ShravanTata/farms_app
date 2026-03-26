@@ -181,14 +181,18 @@ class MainExtensionWindow(BaseWindow):
             extension=extension,
             window_flags=window_flags,
             visible=True,
-            dock_to_extension=False
+            dock_to_extension=True
         )
         # Create unique dockspace ID for this extension
         self.dockspace_id = None
 
+        # Initialize main window upon created by default
+        self.initialize()
+
     def on_initialize(self):
         """ On initialize """
-        self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
+        # self.dockspace_id = imgui.get_id(f"{self._extension.name}_dockspace")
+        pass
 
     def _render(self):
         """ Internal main render call """
@@ -201,8 +205,8 @@ class MainExtensionWindow(BaseWindow):
         # Render the extension menu
         self._extension.render_menu()
         # Each window gets its own dockspace ID
-        imgui.dock_space(
-            self.dockspace_id,
-            (0.0, 0.0),
-            imgui.DockNodeFlags_.passthru_central_node
-        )
+        # imgui.dock_space(
+        #     self.dockspace_id,
+        #     (0.0, 0.0),
+        #     imgui.DockNodeFlags_.passthru_central_node
+        # )
