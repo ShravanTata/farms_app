@@ -12,6 +12,7 @@ from farms_core import pylog
 from imgui_bundle import imgui
 from stevedore import EnabledExtensionManager, extension
 
+
 EXTENSION_NAMESPACE = "farms.app.extension"
 
 
@@ -21,13 +22,15 @@ EXTENSION_NAMESPACE = "farms.app.extension"
 class ExtensionCategory(StrEnum):
     """Categories for organizing and discovering extensions.
 
-    - UI: Extensions that contribute user interface elements or interactive components.
+    - UI: Extensions that contribute user interface elements or interactive components
+      and must always run on the core process.
 
     - WORKFLOW: Extensions that define or modify execution flow of FARMS, processing
-    steps, and can read/write simulation data, add workflow windows.
+    steps, and can read/write simulation data, add workflow windows. Can run on
+    experimental processes.
 
     - CUSTOM: Extensions that do not fit into a standard category, often experimental or
-    new domains that are outside the core of FARMS.
+    new domains that are outside the core of FARMS. Can run on external processes.
 
     """
     UI = "ui"
@@ -61,7 +64,7 @@ class ExtensionManager:
         if self.fail_on_load:
             console.print_exception()
 
-    def check_cb(self, ext: extension):
+    def check_cb(self, ext: 'BaseExtension'):
         return (
             inspect.isclass(ext.plugin) and issubclass(ext.plugin, BaseExtension)
         )
@@ -87,6 +90,7 @@ class ExtensionManager:
             # Move this code to the window manager
             for window in self._enabled_exts[name].obj.windows:
                 window.initialize()
+            pylog.info(f"Enabled extension {name}")
         except Exception as e:
             pylog.error(f"Failed enabling extension {name} with error: {e}")
             console.print_exception(show_locals=True)
@@ -371,8 +375,20 @@ class WorkflowExtension(BaseExtension):
     def __init__(self, name: str):
         super().__init__(name=name)
         self.register_window(MainExtensionWindow(self))
-        self.farms_data = None  # Set by plugin manager
+        self._farms_data = None # Set by plugin manager
         self.stage: Optional[str] = None
+
+    @property
+    def farms_data(self):
+        """ Get farms data """
+        return self._farms_data
+
+    @farms_data.setter
+    def farms_data(self, value):
+        """ Farms data setter """
+        if self._farms_data is not None:
+            raise ValueError("Cannot override already initialized simulation data")
+        self._farms_data = value
 
     def render_menu(self):
         """ Render menu """
@@ -427,7 +443,11 @@ class CustomExtension(BaseExtension):
         """ Render menu """
         pass
 
+    def before_render(self):
+        pass
+
     def render(self):
+
         if self.hide:
             return
 

@@ -94,7 +94,8 @@ class ApplicationOptions(Options):
         self.extension = extension_options
 
         # FPS
-        self.fps = kwargs.pop("fps", 60.0)       # 60 FPS by default
+        self.fps: float = kwargs.pop("fps", 60)       # 60 FPS by default
+        self.enable_idling: bool  = kwargs.pop("enable_idling", False)
 
         # Plot options
 

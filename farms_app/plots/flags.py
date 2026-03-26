@@ -1,6 +1,6 @@
 from functools import cache
-from imgui_bundle import implot
-from imgui_bundle import imgui
+
+from imgui_bundle import imgui, implot
 
 
 @cache

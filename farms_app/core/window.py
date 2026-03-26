@@ -2,12 +2,26 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from farms_app.console import console
 from farms_app.extensions.base import BaseExtension
 from farms_core import pylog
 from imgui_bundle import imgui
+
+
+class WindowManager:
+    """Slim window registry. Will grow into layout persistence."""
+
+    def __init__(self):
+        self.windows: list[BaseWindow] = []
+
+    def register(self, window: "BaseWindow") -> None:
+        self.windows.append(window)
+
+    def unregister(self, window: "BaseWindow") -> None:
+        if window in self.windows:
+            self.windows.remove(window)
 
 
 class BaseWindow(ABC):
@@ -27,6 +41,15 @@ class BaseWindow(ABC):
             window_flags: ImGui window flags
             visible: Initial visibility state
             dock_to_extension: Whether to dock to extension's dockspace initially
+
+        Lifecycle
+        ---------
+        1. Construction  — sets up IDs and flags, no imgui calls.
+        2. initialize()  — called explicitly by the extension after it has set up
+                       its own context (e.g. state, runner).  Safe to call any
+                       imgui API here since the manager guarantees a valid frame.
+        3. _render()     — called every frame by ExtensionManager.tick_app().
+                       Guards on _initialized and _visible before touching imgui.
         """
 
         self.name: str = name

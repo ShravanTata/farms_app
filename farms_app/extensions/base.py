@@ -15,12 +15,12 @@ class BaseExtension(ABC):
     farms_version = ""
     farms_author = ""
 
-    def __init__(self):
+    def __init__(self, name: str):
         ""
         super().__init__()
         self.show_window: bool = True
         self.window_name = "Base Widget"
-        self.name: str = "Name"
+        self.name: str = name
         self.stage = None
         self.performance_warnings = []
         self.windows = []
@@ -104,8 +104,8 @@ class UIExtension(BaseExtension):
     Full app interface access.
     Can modify menus, toolbars, status bars, and global UI.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name=name)
         self.app_context = None  # Full access
 
 
@@ -114,8 +114,8 @@ class WorkflowExtension(BaseExtension):
     FARMS domain access.
     Can read/write simulation data, add workflow windows.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name)
         self.farms_data = None  # Set by plugin manager
         self.is_focused = False
 
@@ -152,8 +152,8 @@ class CustomExtension(BaseExtension):
     Minimal host context; no FARMS data required.
     user experiments, visualizations, no communication between extensions
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name)
         # No special data access
 
     def render(self):
