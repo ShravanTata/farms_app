@@ -93,7 +93,21 @@ class BaseWindow(ABC):
 
     def _render(self) -> None:
         """ Internal main render call """
-        if imgui.begin(self._window_id, flags=self._window_flags):
+        display_size = imgui.get_io().display_size
+        imgui.set_next_window_pos(
+            imgui.ImVec2(display_size.x * 0.5, display_size.y * 0.5),
+            imgui.Cond_.first_use_ever,
+            imgui.ImVec2(0.5, 0.5)  # pivot: 0.5, 0.5 means "center the window on that point"
+        )
+        imgui.set_next_window_size(imgui.ImVec2(400, 300), imgui.Cond_.first_use_ever)
+        # if imgui.begin(self._window_id, flags=self._window_flags):
+        expanded, self._visible = imgui.begin(
+            self._window_id,
+            self._visible,  # p_open — required for ini tracking of closeable windows
+            flags=self._window_flags
+        )
+        if expanded:
+            imgui.text(f"ID: {self._window_id}")  # confirm the name
             self.on_render()
         imgui.end()
 
