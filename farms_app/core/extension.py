@@ -365,68 +365,6 @@ class UIExtension(BaseExtension):
         """ On event """
 
 
-class WorkflowExtension(BaseExtension):
-    """
-    FARMS domain access.
-    Can read/write simulation data, add workflow windows.
-    """
-
-    CATEGORY = ExtensionCategory.WORKFLOW
-
-    def __init__(self, name: str):
-        super().__init__(name=name)
-        self.register_window(MainExtensionWindow(self))
-        self._farms_data = None # Set by plugin manager
-        self.stage: Optional[str] = None
-
-    @property
-    def farms_data(self):
-        """ Get farms data """
-        return self._farms_data
-
-    @farms_data.setter
-    def farms_data(self, value):
-        """ Farms data setter """
-        if self._farms_data is not None:
-            raise ValueError("Cannot override already initialized simulation data")
-        self._farms_data = value
-
-    def render_menu(self):
-        """ Render menu """
-        pass
-
-    def before_render(self):
-        pass
-
-    def render(self):
-        if self.hide:
-            return
-
-        # Call the user render function
-        self.on_render()
-
-        # Render other associated windows
-        for window in self.windows:
-            # if window._should_dock_to_extension:
-            #     # Reset if True
-            #     window._should_dock_to_extension = False
-            #     imgui.set_next_window_dock_id(
-            #         self.windows[0].dockspace_id,
-            #         cond=imgui.Cond_.always
-            #     )
-            if window._initialized:
-                window._render()
-
-    def after_render(self):
-        pass
-
-    def on_update(self):
-        """ On update called before rendering """
-
-    def on_event(self):
-        """ On event """
-
-
 class CustomExtension(BaseExtension):
     """
     Independent / standalone extensions.
