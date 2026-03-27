@@ -87,12 +87,10 @@ class ExtensionManager:
                 obj=_ext.plugin(),
                 category=ExtensionManager._get_type(_ext.plugin)
             )
-            # Move this code to the window manager
-            for window in self._enabled_exts[name].obj.windows:
-                window.initialize()
-            pylog.info(f"Enabled extension {name}")
+
             # Call extension enable
             self._enabled_exts[name].on_enable()
+
         except Exception as e:
             pylog.error(f"Failed enabling extension {name} with error: {e}")
             console.print_exception(show_locals=True)
