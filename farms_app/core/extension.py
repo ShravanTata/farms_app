@@ -91,6 +91,8 @@ class ExtensionManager:
             for window in self._enabled_exts[name].obj.windows:
                 window.initialize()
             pylog.info(f"Enabled extension {name}")
+            # Call extension enable
+            self._enabled_exts[name].on_enable()
         except Exception as e:
             pylog.error(f"Failed enabling extension {name} with error: {e}")
             console.print_exception(show_locals=True)
@@ -104,6 +106,9 @@ class ExtensionManager:
             return False
 
         try:
+            # First call user and then extension cleanup
+            self._enabled_exts[name].on_disable()
+            self._enabled_exts[name].cleanup()
             del self._enabled_exts[name]
         except Exception as e:
             pylog.error(f"Error in unregister() for module {name}: {e}")
