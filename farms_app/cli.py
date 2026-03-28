@@ -6,7 +6,7 @@ from farms_app.core.application import FARMSApplication
 from farms_app.core.options import ApplicationOptions
 
 
-pylog.set_level("debug")
+pylog.set_level("error")
 
 
 def main():
