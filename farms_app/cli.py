@@ -11,7 +11,7 @@ pylog.set_level("debug")
 
 def main():
     """ Main Application """
-    app_options = ApplicationOptions(title="FARMS-APP")
+    app_options = ApplicationOptions(title="FARMS-APP", auto_enable=["status_bar",])
     app = FARMSApplication.from_options(app_options)
     app.run()
 

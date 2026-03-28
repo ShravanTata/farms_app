@@ -1,8 +1,6 @@
 """ Status Bar """
 
 from farms_app.core.extension import UIExtension
-from farms_app.core.window import BaseWindow
-
 from imgui_bundle import imgui
 
 
@@ -10,23 +8,8 @@ class StatusBarExtension(UIExtension):
     """ Status bar for the app """
 
     def __init__(self):
-        name = "StatusBar"
-        super().__init__(name=name)
-        self.register_window(StatusBarWindow(self))
-
-    def get_dependencies(self):
-        """ Get extension dependencies """
-
-    def cleanup(self):
-        """ Cleanup resources before unloading the extension """
-
-
-class StatusBarWindow(BaseWindow):
-    """ Render Status Bar """
-
-    def __init__(self, extension) -> None:
-        name: str = "statusbar"
-        window_flags = (
+        super().__init__(name="StatusBar")
+        self._window_flags = (
             imgui.WindowFlags_.no_title_bar |
             imgui.WindowFlags_.no_resize |
             imgui.WindowFlags_.no_move |
@@ -36,22 +19,9 @@ class StatusBarWindow(BaseWindow):
             imgui.WindowFlags_.no_bring_to_front_on_focus |
             imgui.WindowFlags_.no_nav_focus
         )
-        super().__init__(
-            name=name,
-            extension=extension,
-            window_flags=window_flags,
-            visible=True,
-            dock_to_extension=False
-        )
-
-    def on_initialize(self):
-        """ On initialize """
-
-    def on_update(self):
-        """ On update """
 
     def on_render(self):
-        """ Render main extension dockspace """
+        """ Render status bar as a viewport side bar """
         imgui_io = imgui.get_io()
         font_size = imgui.get_font_size()
         dy = font_size * 0.15

@@ -8,8 +8,7 @@ from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
 from farms_app.backends.base import BaseBackend
 from farms_app.console import console
-from farms_app.core.extension import ExtensionCategory, ExtensionManager
-from farms_app.core.menus import default_main_menu
+from farms_app.core.extension import ExtensionManager
 from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui, implot
@@ -17,7 +16,7 @@ import time
 
 from .options import ApplicationOptions
 
-pylog.set_level("debug")
+pylog.set_level("error")
 
 
 class FARMSApplication:
@@ -35,9 +34,9 @@ class FARMSApplication:
         self._setup_backend(self._options)
         self.show_metrics_window = True
 
-        self.fps_idle = 9.0     # FPS when idling
-        self.enable_idling = False  # a bool to enable/disable idling
-        self.is_idling = False     # an output parameter filled by the runner
+        self.fps_idle = options.fps_idle
+        self.enable_idling = options.enable_idling
+        self.is_idling = False
 
         # Fonts
         self._io.fonts.add_font_from_file_ttf(
@@ -54,10 +53,10 @@ class FARMSApplication:
         """ Setup backend """
         backend_manager = BackendManager()
         self.backend = backend_manager.initialize(
-            backend_type="glfw",
+            backend_type=options.backend.platform,
             gl_version=OpenGLVersion.GL2
         )
-        self.backend.initialize(name=self._options.title)
+        self.backend.initialize(name=options.title)
         self._io = imgui.get_io()
         return backend_manager
 
@@ -83,60 +82,26 @@ class FARMSApplication:
         """ Initialize using options """
         return cls(options)
 
-    def render_extensions(self):
-        for name, extension in self.extension_manager._enabled_exts.items():
-            if extension.category == ExtensionCategory.UI:
-                extension.obj.render()
-            elif extension.category == ExtensionCategory.WORKFLOW:
-                extension.obj.update()
-                extension.obj.event()
-                extension.obj.render()
-            elif extension.category == ExtensionCategory.CUSTOM:
-                extension.obj.update()
-                extension.obj.event()
-                extension.obj.render()
-
     def render_menu(self):
         """ Render menu """
         imgui.begin_main_menu_bar()
 
+        # Extension menus (namespaced top-level menus)
+        for name, extension in self.extension_manager._enabled_exts.items():
+            extension.obj.menu()
+
         if imgui.begin_menu("View"):
-            if imgui.menu_item_simple("to-maindock", shortcut=""):
-                for name, ext in self.extension_manager._enabled_exts.items():
-                    ext.obj.dock_all_windows_to_extension()
             if imgui.begin_menu("Theme"):
                 imgui.show_style_selector("Styles")
                 imgui.show_style_editor()
                 imgui.end_menu()
-            if imgui.begin_menu("UI"):
-                for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == ExtensionCategory.UI:
-                        clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.hide
-                        )
-                        if clicked:
-                            extension.obj.hide = new_state
-                imgui.end_menu()
             imgui.separator()
-            if imgui.begin_menu("Workflow"):
-                for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == ExtensionCategory.WORKFLOW:
-                        clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.hide
-                        )
-                        if clicked:
-                            extension.obj.hide = new_state
-                imgui.end_menu()
-            imgui.separator()
-            if imgui.begin_menu("Custom"):
-                for name, extension in self.extension_manager._enabled_exts.items():
-                    if extension.category == ExtensionCategory.CUSTOM:
-                        clicked, new_state = imgui.menu_item(
-                            name, shortcut="", p_selected=extension.obj.hide
-                        )
-                        if clicked:
-                            extension.obj.hide = new_state
-                imgui.end_menu()
+            for name, extension in self.extension_manager._enabled_exts.items():
+                clicked, new_state = imgui.menu_item(
+                    name, shortcut="", p_selected=not extension.obj.hide
+                )
+                if clicked:
+                    extension.obj.hide = not new_state
             imgui.end_menu()
 
         if imgui.begin_menu("Debug"):
@@ -168,7 +133,15 @@ class FARMSApplication:
     def run(self):
         """main run method"""
 
+        _first = True
+        _last_time = time.perf_counter()
+
         while not self.backend.should_close():
+
+            # Frame timing
+            now = time.perf_counter()
+            dt = now - _last_time
+            _last_time = now
 
             # Idling
             self.fps_idling()
@@ -180,14 +153,15 @@ class FARMSApplication:
             self.backend.begin_frame()
 
             # Render main menu
-            default_main_menu()
             self.render_menu()
 
-            if self.show_metrics_window:
-                imgui.show_metrics_window()
+            if _first:
+                for ext_name in self._options.auto_enable:
+                    self.extension_manager.enable(ext_name)
+                _first = False
 
-            # Render extensions
-            self.render_extensions()
+            # Tick all extensions: update(dt) -> event() -> render()
+            self.extension_manager.tick(dt)
 
             # End the Dear ImGui frame
             self.backend.end_frame()

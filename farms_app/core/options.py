@@ -94,10 +94,12 @@ class ApplicationOptions(Options):
         self.extension = extension_options
 
         # FPS
-        self.fps: float = kwargs.pop("fps", 60)       # 60 FPS by default
-        self.enable_idling: bool  = kwargs.pop("enable_idling", False)
+        self.fps: float = kwargs.pop("fps", 60)
+        self.fps_idle: float = kwargs.pop("fps_idle", 9.0)
+        self.enable_idling: bool = kwargs.pop("enable_idling", False)
 
-        # Plot options
+        # Extensions to enable on startup
+        self.auto_enable: list[str] = kwargs.pop("auto_enable", ["status_bar"])
 
 
 if __name__ == '__main__':
