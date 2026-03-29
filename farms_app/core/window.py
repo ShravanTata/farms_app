@@ -57,6 +57,8 @@ class Window:
         # Window state
         self._initialized: bool = False
         self._visible: bool = visible
+        self._focused: bool = False
+        self._hovered: bool = False
 
         # Window properties that can be saved/restored
         self._window_size: Optional[tuple[float, float]] = None
@@ -88,6 +90,8 @@ class Window:
             self._visible,
             flags=self._window_flags
         )
+        self._focused = imgui.is_window_focused()
+        self._hovered = imgui.is_window_hovered()
         if expanded:
             self.on_render()
         imgui.end()
