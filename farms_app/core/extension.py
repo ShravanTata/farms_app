@@ -1,8 +1,6 @@
 """ Extensions management and implementation """
 
 import inspect
-import time
-from typing import List
 
 from farms_app.console import console
 from farms_app.core.window import Window
@@ -49,7 +47,17 @@ class ExtensionManager:
 
     @property
     def names(self):
+        """All discovered extension names (enabled and disabled)."""
         return self._mgr.names()
+
+    @property
+    def enabled(self):
+        """List of (name, extension) pairs for all enabled extensions."""
+        return [(name, ee.obj) for name, ee in self._enabled_exts.items()]
+
+    def is_enabled(self, name: str) -> bool:
+        """Check if an extension is currently enabled."""
+        return name in self._enabled_exts
 
     def get(self, name: str):
         """Get an enabled extension instance by name."""
@@ -59,6 +67,10 @@ class ExtensionManager:
 
     def enable(self, name: str) -> bool:
         """Instantiate and enable an extension."""
+        if name in self._enabled_exts:
+            pylog.warning(f"Extension {name} is already enabled")
+            return True
+
         if name not in self.names:
             pylog.error(f"Requested extension {name} is not available")
             return False
@@ -98,7 +110,7 @@ class ExtensionManager:
 
     def tick(self, dt: float):
         """Per-frame dispatch: update -> event -> render for all enabled extensions."""
-        for name, enabled_ext in self._enabled_exts.items():
+        for name, enabled_ext in list(self._enabled_exts.items()):
             try:
                 enabled_ext.obj.on_update(dt)
                 enabled_ext.obj.on_event()
