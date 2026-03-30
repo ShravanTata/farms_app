@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, TypeVar
 
 from farms_app.console import console
 from farms_core import pylog
@@ -11,6 +11,8 @@ from imgui_bundle import imgui
 
 if TYPE_CHECKING:
     from farms_app.core.extension import Extension
+
+E = TypeVar('E', bound='Extension')
 
 
 class WindowManager:
@@ -27,7 +29,7 @@ class WindowManager:
             self.windows.remove(window)
 
 
-class Window:
+class Window(Generic[E]):
     """Base class for all extension windows.
 
     Lifecycle
@@ -45,12 +47,12 @@ class Window:
 
     def __init__(
             self, name: str,
-            extension: Extension,
+            extension: E,
             window_flags: imgui.WindowFlags_ = imgui.WindowFlags_.none,
             visible: bool = True,
     ):
         self.name: str = name
-        self._extension: Extension = extension
+        self._extension: E = extension
         self._window_id: str = f"{name}##{self._extension.name}"
         self._window_flags: imgui.WindowFlags_ = window_flags
 
