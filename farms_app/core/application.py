@@ -38,13 +38,12 @@ class FARMSApplication:
         self.enable_idling = options.enable_idling
         self.is_idling = False
 
-        # Fonts
-        self._io.fonts.add_font_from_file_ttf(
-            str(paths.get_project_root().joinpath(
-                "farms_app", "assets", "fonts", "JetBrainsMono[wght].ttf"
-            )),
-            14
-        )
+        # Fonts — load JetBrains Mono with FontAwesome icons merged in
+        from imgui_bundle import hello_imgui
+        font_path = str(paths.get_project_root().joinpath(
+            "farms_app", "assets", "fonts", "JetBrainsMono[wght].ttf"
+        ))
+        hello_imgui.load_font_ttf_with_font_awesome_icons(font_path, 14)
 
         # Setup extensions
         self.extension_manager = ExtensionManager()
