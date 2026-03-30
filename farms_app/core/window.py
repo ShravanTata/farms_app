@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from farms_app.console import console
 from farms_core import pylog
@@ -17,12 +17,12 @@ class WindowManager:
     """Slim window registry. Will grow into layout persistence."""
 
     def __init__(self):
-        self.windows: list[BaseWindow] = []
+        self.windows: list[Window] = []
 
-    def register(self, window: "BaseWindow") -> None:
+    def register(self, window: "Window") -> None:
         self.windows.append(window)
 
-    def unregister(self, window: "BaseWindow") -> None:
+    def unregister(self, window: "Window") -> None:
         if window in self.windows:
             self.windows.remove(window)
 
