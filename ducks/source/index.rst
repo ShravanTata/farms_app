@@ -17,6 +17,7 @@ Contents
 
    overview
    introduction
+   architecture
    core/index.rst
 
 .. sidebar-links::
