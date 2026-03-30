@@ -126,7 +126,7 @@ class GLFWBackend(BaseBackend):
             io.config_viewports_no_task_bar_icon = True
 
         # Setup style
-        imgui.style_colors_light()
+        imgui.style_colors_classic()
         implot.style_colors_auto()
         implot3d.style_colors_auto()
 
