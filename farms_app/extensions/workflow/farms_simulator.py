@@ -224,7 +224,7 @@ class MuJoCoWindow(BaseWindow):
 
         imgui.image_button(
             "##",
-            imgui.ImTextureRef(self.texture_id),
+            self.texture_id, # imgui.ImTextureRef(self.texture_id)
             imgui.ImVec2((self.width, self.height)),
             uv0=imgui.ImVec2((1, 1)),
             uv1=imgui.ImVec2((0, 0)),
@@ -499,8 +499,8 @@ class FarmsSimulatorExtension(WorkflowExtension):
             loc=-1.0, scale=1.0, size=(n_samples, n_vars)
         )
 
-        self.setup_simulation()
-        self.register_window(MuJoCoWindow(self, self.model, self.data))
+        # self.setup_simulation()
+        # self.register_window(MuJoCoWindow(self, self.model, self.data))
         self.register_window(NetworkVisualizerWindow(self))
 
     def setup_simulation(self):
@@ -805,6 +805,7 @@ class FarmsSimulatorExtension(WorkflowExtension):
 
     def on_update(self):
         # Normal GUI operation
+        return
         dt = 1/60
         self.n_steps = int(1000 * (dt + self.dt_remainder) * self.playback_speed)
         self.dt_remainder = (1000 * (dt + self.dt_remainder) * self.playback_speed - self.n_steps) / 1000
@@ -829,9 +830,9 @@ class FarmsSimulatorExtension(WorkflowExtension):
 
     def on_event(self):
         """ On events """
-        if self.windows[1].is_scene_hovered:
-            self.windows[1].mouse_iteractions()
-            self.windows[1].keyboard_interactions()
+        # if self.windows[1].is_scene_hovered:
+        #     self.windows[1].mouse_iteractions()
+        #     self.windows[1].keyboard_interactions()
 
     def render_window(self) -> None:
         if not(self.animat_options and self.simulation_options and self.arena_options):

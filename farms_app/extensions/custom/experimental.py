@@ -46,7 +46,7 @@ class VideoWindow(BaseWindow):
 
     def on_render(self):
         """ Render main extension dockspace """
-        print(self._extension.data)
+
         if self._extension.data:
             button_name = "Pause" if self._extension.play else "Play"
             if imgui.button(button_name):
@@ -1186,9 +1186,9 @@ class ExperimentalExtension(CustomExtension):
         self.show_window = True
         self._io = imgui.get_io()
         self.data = {}
-        self.frame = 100
+        self.frame = 0
         self.performance_warnings = []
-        self.play = True
+        self.play = False
 
         self.current_frame = None
         self.texture_id = 0
@@ -1365,8 +1365,9 @@ class ExperimentalExtension(CustomExtension):
                 imgui.end_disabled()
 
             if clicked and all_loaded:
-                self.windows[2].initialize()
-                self.windows[2]._run_analysis()
+                # self.windows[2].initialize()
+                # self.windows[2]._run_analysis()
+                pass
 
             imgui.end_menu()
 
@@ -1379,6 +1380,7 @@ class ExperimentalExtension(CustomExtension):
 
     def _load_csv(self, path: str, side: str | None, key: str) -> None:
         """Load a single CSV file into the extension for the given channel."""
+
         self._load_error = ""
         try:
             df = pd.read_csv(path)
@@ -1403,124 +1405,3 @@ class ExperimentalExtension(CustomExtension):
         self._analysis        = None
         self._analysis_error  = ""
         self._selected_gait_idx = 0
-
-    def render_window(self) -> None:
-        imgui.text("---   File dialogs   ---")
-        if imgui.button("Load"):
-            self.result = pfd.open_file("Load csv", default_path="", filters=("*.csv",), options=pfd.opt.multiselect).result()
-            self.data["left"] = pd.read_csv(self.result[0])
-            self.data["right"] = pd.read_csv(self.result[1])
-            self.load_video()
-
-        if self.data:
-            button_name = "Pause" if self.play else "Play"
-            if imgui.button(button_name):
-                self.play = not self.play
-            if self.play:
-                time.sleep(0.01)
-            self.seek_frame(self.frame)
-            if imgui.begin_child("Video", child_flags=imgui.ChildFlags_.borders | imgui.ChildFlags_.resize_x | imgui.ChildFlags_.resize_y):
-                imgui.image(
-                    int(self.texture_id),
-                    imgui.ImVec2((self.frame_width, self.frame_height)),
-                    uv0=imgui.ImVec2((0,0)),
-                    uv1=imgui.ImVec2((1,1)),
-                    # border_color=imgui.ImVec4((1, 0, 0, 1))
-                )
-            imgui.end_child()
-
-            imgui.same_line()
-            if implot3d.begin_plot("Mouse"):
-                axes_flags = implot.AxisFlags_.lock | implot.AxisFlags_.no_grid_lines | implot.AxisFlags_.no_tick_marks
-                # implot3d.set_next_line_style(weight=2.0)
-                implot3d.setup_box_scale(x=5.0, y=1.0, z=1.0)
-                implot3d.setup_axes_limits(0, 800, -25.0, 160, 0, 100)
-                implot3d.setup_box_initial_rotation(-85.0, 180.0)
-                implot3d.setup_axis(implot3d.ImAxis3D_.x, label="x", flags=axes_flags)
-                implot3d.setup_axis(implot3d.ImAxis3D_.y, label="y", flags=axes_flags)
-                implot3d.setup_axis(implot3d.ImAxis3D_.z, label="z", flags=axes_flags)
-                for side, data in self.data.items():
-                    implot3d.set_next_marker_style(implot3d.Marker_.circle)
-                    implot3d.plot_line(
-                        f"{side}-hind",
-                        np.array(
-                            (
-                                data["iliac_x"][self.frame],
-                                data["hip_x"][self.frame],
-                                data["knee_x"][self.frame],
-                                data["ankle_x"][self.frame],
-                                data["toe_x"][self.frame],
-                            )
-                        ),
-                        np.array(
-                            (
-                                data["iliac_y"][self.frame],
-                                data["hip_y"][self.frame],
-                                data["knee_y"][self.frame],
-                                data["ankle_y"][self.frame],
-                                data["toe_y"][self.frame],
-                            )
-                        ),
-                        np.array(
-                            (
-                                data["iliac_z"][self.frame],
-                                data["hip_z"][self.frame],
-                                data["knee_z"][self.frame],
-                                data["ankle_z"][self.frame],
-                                data["toe_z"][self.frame],
-                            )
-                        ),
-                    )
-                    implot3d.set_next_marker_style(implot3d.Marker_.circle)
-                    implot3d.plot_line(
-                        f"{side}-fore",
-                        np.array(
-                            (
-                                data["shoulder_x"][self.frame],
-                                data["elbow_x"][self.frame],
-                                data["wrist_x"][self.frame],
-                                data["finger_x"][self.frame],
-                            )
-                        ),
-                        np.array(
-                            (
-                                data["shoulder_y"][self.frame],
-                                data["elbow_y"][self.frame],
-                                data["wrist_y"][self.frame],
-                                data["finger_y"][self.frame],
-                            )
-                        ),
-                        np.array(
-                            (
-                                data["shoulder_z"][self.frame],
-                                data["elbow_z"][self.frame],
-                                data["wrist_z"][self.frame],
-                                data["finger_z"][self.frame],
-                            )
-                        ),
-                    )
-                implot3d.end_plot()
-
-            if implot.begin_subplots("Joint angles", 3, 1, (-1, -1)):
-                start_idx = max(0, self.frame - 100 + 1)
-                end_idx = self.frame + 1
-                if implot.begin_plot(""):
-                    implot.plot_line("left-hip", np.array(self.data["left"]["hip_angle"][start_idx:end_idx]))
-                    implot.plot_line("right-hip", np.array(self.data["right"]["hip_angle"][start_idx:end_idx]))
-                    implot.end_plot()
-                if implot.begin_plot(""):
-                    implot.plot_line("left-knee", np.array(self.data["left"]["knee_angle"][start_idx:end_idx]))
-                    implot.plot_line("right-knee", np.array(self.data["right"]["knee_angle"][start_idx:end_idx]))
-                    implot.end_plot()
-                if implot.begin_plot(""):
-                    implot.plot_line("left-ankle", np.array(self.data["left"]["ankle_angle"][start_idx:end_idx]))
-                    implot.plot_line("right-ankle", np.array(self.data["right"]["ankle_angle"][start_idx:end_idx]))
-                    implot.end_plot()
-
-                implot.end_subplots()
-
-            if self.frame < min(len(self.data['left']), len(self.data['right'])) - 1:
-                if self.play:
-                    self.frame += 1
-            else:
-                self.frame = 0

@@ -144,9 +144,15 @@ class MuJoCoWindow(BaseWindow):
         self.setup_mj_scene()
 
         # Create framebuffer
-        self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
-            self.width, self.height
-        )
+        # self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
+        #     self.width, self.height
+        # )
+        # self.mj_option.samples = 4
+        (self.msaa_fbo,
+        self.resolve_fbo,
+        self.resolve_texture,
+        self.msaa_color_rb,
+        self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height, 4)
 
     def _get_names_from_mjenum(self, mj_enum):
         return [
@@ -226,17 +232,19 @@ class MuJoCoWindow(BaseWindow):
 
     def render_main_scene(self):
         """ Render main scene """
+
         # Bind framebuffer
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.msaa_fbo)
         GL.glViewport(0, 0, self.width, self.height)
 
         # Minimal OpenGL setup - let MuJoCo handle lighting
-        # GL.glEnable(GL.GL_DEPTH_TEST)
-        # GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
-        GL.glClearColor(0.1, 0.1, 0.1, 1.0)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
+        GL.glClearColor(1.0, 1.0, 1.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         # Update and render
+
         mujoco.mjv_updateScene(
             self.model, self.data, self.mj_option, None, self.mj_camera,
             mujoco.mjtCatBit.mjCAT_ALL, self.mj_scene
@@ -248,7 +256,37 @@ class MuJoCoWindow(BaseWindow):
         except GL.GLError:
             pass
         # GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        # GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
+        GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
+
+        # Disable shaders
+        # GL.glUseProgram(0)
+
+        # # Unbind buffers
+        # # GL.glBindVertexArray(0)
+        # GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+        # GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, 0)
+        # GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+
+        # # Reset active texture and unbind 2D texture
+        # GL.glActiveTexture(GL.GL_TEXTURE0)
+        # GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+
+        # # Disable tests
+        # GL.glDisable(GL.GL_SCISSOR_TEST)
+        GL.glDisable(GL.GL_DEPTH_TEST)
+        # GL.glDisable(GL.GL_STENCIL_TEST)
+
+        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.msaa_fbo)
+        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.resolve_fbo)
+        GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
+        GL.glBlitFramebuffer(
+            0, 0, self.width, self.height,
+            0, 0, self.width, self.height,
+            GL.GL_COLOR_BUFFER_BIT,
+            GL.GL_LINEAR,
+        )
+        GL.glDisable(GL.GL_FRAMEBUFFER_SRGB)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
         target_aspect = self.width / self.height
         avail_width, avail_height = imgui.get_content_region_avail()
@@ -267,9 +305,9 @@ class MuJoCoWindow(BaseWindow):
 
         imgui.image(
             # "##",
-            imgui.ImTextureRef(self.texture_id),
+            imgui.ImTextureRef(self.resolve_texture),
             # self.texture_id,
-            imgui.ImVec2((self.width, self.height)),
+            imgui.ImVec2((draw_width, draw_height)),
             uv0=imgui.ImVec2((1, 1)),
             uv1=imgui.ImVec2((0, 0)),
         )
@@ -313,46 +351,174 @@ class MuJoCoWindow(BaseWindow):
         self.mj_viewport = mujoco.MjrRect(0, 0, 0, 0)
         self.mj_viewport.width, self.mj_viewport.height = self.width, self.height
 
-    @staticmethod
-    def create_framebuffer(width: int, height: int):
-        """ Create Framebuffer """
-        texture_id = GL.glGenTextures(1)
 
-        GL.glBindTexture(GL.GL_TEXTURE_2D, texture_id)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, width, height, 0,
-                        GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
-        # Set texture parameters
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
+    @staticmethod
+    def create_framebuffer(width: int, height: int, samples: int = 4):
+        """
+        Create MSAA framebuffer for MuJoCo rendering + resolve framebuffer for ImGui.
+        Returns:
+        msaa_fbo, resolve_fbo, resolve_texture, msaa_color_rb, msaa_depth_rb
+        """
+
+        # -------------------------
+        # MSAA framebuffer (render target)
+        # -------------------------
+        msaa_fbo = GL.glGenFramebuffers(1)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, msaa_fbo)
+
+        # Multisampled color renderbuffer
+        msaa_color_rb = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_color_rb)
+        GL.glRenderbufferStorageMultisample(
+            GL.GL_RENDERBUFFER,
+            samples,
+            GL.GL_RGBA8,
+            width,
+            height,
+        )
+        GL.glFramebufferRenderbuffer(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_COLOR_ATTACHMENT0,
+            GL.GL_RENDERBUFFER,
+            msaa_color_rb,
+        )
+
+        # Multisampled depth renderbuffer
+        msaa_depth_rb = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_depth_rb)
+        GL.glRenderbufferStorageMultisample(
+            GL.GL_RENDERBUFFER,
+            samples,
+            GL.GL_DEPTH_COMPONENT24,
+            width,
+            height,
+        )
+        GL.glFramebufferRenderbuffer(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_DEPTH_ATTACHMENT,
+            GL.GL_RENDERBUFFER,
+            msaa_depth_rb,
+        )
+
+        if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
+            raise RuntimeError("MSAA framebuffer is not complete")
+
+        # -------------------------
+        # Resolve framebuffer (texture for ImGui)
+        # -------------------------
+        resolve_fbo = GL.glGenFramebuffers(1)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, resolve_fbo)
+
+        resolve_texture = GL.glGenTextures(1)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, resolve_texture)
+
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D,
+            0,
+            GL.GL_SRGB8_ALPHA8,   # IMPORTANT: sRGB output
+            width,
+            height,
+            0,
+            GL.GL_RGBA,
+            GL.GL_UNSIGNED_BYTE,
+            None,
+        )
+
+        # Use nearest to avoid ImGui-induced blur
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
 
-        # Create framebuffer
-        framebuffer = GL.glGenFramebuffers(1)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, framebuffer)
-
-        # Attach texture to framebuffer
-        GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
-                                  GL.GL_TEXTURE_2D, texture_id, 0)
-
-        # Create depth buffer
-        depth_buffer = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, depth_buffer)
-        GL.glRenderbufferStorage(
-            GL.GL_RENDERBUFFER, GL.GL_DEPTH_COMPONENT24, width, height
+        GL.glFramebufferTexture2D(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_COLOR_ATTACHMENT0,
+            GL.GL_TEXTURE_2D,
+            resolve_texture,
+            0,
         )
-        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT,
-                                    GL.GL_RENDERBUFFER, depth_buffer)
 
-        # Check framebuffer completeness
         if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
-            pylog.error("Framebuffer not complete!")
+            raise RuntimeError("Resolve framebuffer is not complete")
 
-        # GL.glEnable(GL.GL_MULTISAMPLE)
-
-        # unbind framebuffer
+        # Unbind
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        return framebuffer, texture_id, depth_buffer
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, 0)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+
+        return (
+            msaa_fbo,
+            resolve_fbo,
+            resolve_texture,
+            msaa_color_rb,
+            msaa_depth_rb,
+        )
+
+    # @staticmethod
+    # def create_framebuffer(width: int, height: int):
+    #     """ Create Framebuffer """
+    #     texture_id = GL.glGenTextures(1)
+
+    #     GL.glBindTexture(GL.GL_TEXTURE_2D, texture_id)
+    #     GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, width, height, 0,
+    #                     GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
+    #     # Set texture parameters
+    #     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+    #     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
+    #     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
+    #     GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
+
+    #     #
+    #     samples = 4  # or 8
+
+    #     color_rb = GL.glGenRenderbuffers(1)
+    #     GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, color_rb)
+    #     GL.glRenderbufferStorageMultisample(
+    #         GL.GL_RENDERBUFFER, samples, GL.GL_RGBA8, width, height
+    #     )
+
+    #     depth_rb = GL.glGenRenderbuffers(1)
+    #     GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, depth_rb)
+    #     GL.glRenderbufferStorageMultisample(
+    #         GL.GL_RENDERBUFFER, samples, GL.GL_DEPTH_COMPONENT24, width, height
+    #     )
+
+
+    #     # Create framebuffer
+    #     framebuffer = GL.glGenFramebuffers(1)
+    #     GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, framebuffer)
+
+    #     # Attach texture to framebuffer
+    #     GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
+    #                               GL.GL_TEXTURE_2D, texture_id, 0)
+
+
+    #     GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, msaa_fbo)
+    #     GL.glBlitFramebuffer(
+    #         0, 0, width, height,
+    #         0, 0, width, height,
+    #         GL.GL_COLOR_BUFFER_BIT,
+    #         GL.GL_LINEAR
+    #     )
+
+    #     # Create depth buffer
+    #     depth_buffer = GL.glGenRenderbuffers(1)
+    #     GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, depth_buffer)
+    #     GL.glRenderbufferStorage(
+    #         GL.GL_RENDERBUFFER, GL.GL_DEPTH_COMPONENT24, width, height
+    #     )
+    #     GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT,
+    #                                 GL.GL_RENDERBUFFER, depth_buffer)
+
+    #     # Check framebuffer completeness
+    #     if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
+    #         pylog.error("Framebuffer not complete!")
+
+    #     # GL.glEnable(GL.GL_MULTISAMPLE)
+
+    #     # unbind framebuffer
+    #     GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+    #     return framebuffer, texture_id, depth_buffer
 
     def resize_framebuffer(self, width, height):
         # Delete old OpenGL resources
@@ -363,9 +529,14 @@ class MuJoCoWindow(BaseWindow):
         # Recreate them with new size
         self.mj_viewport.width, self.mj_viewport.height = width, height
 
-        self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
-            self.width, self.height
-        )
+        # self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
+        #     self.width, self.height
+        # )
+        (self.msaa_fbo,
+        self.resolve_fbo,
+        self.resolve_texture,
+        self.msaa_color_rb,
+        self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height)
 
     def run_simulation(self):
         """ Run Simulation """
@@ -465,6 +636,8 @@ class FarmsSimulatorExtension(WorkflowExtension):
         """ Register windows """
         self.register_window(MuJoCoWindow(self, self.model, self.data))
         self.register_window(AnalysisWindow(self, self.sim, self.farms_data))
+        # self.register_window(PropertiesWindow(self, self.sim, self.farms_data))
+        # self.register_window(NetworkWindow(self, self.sim, self.farms_data))
 
     def setup_simulation(self):
         self.animat_data = AnimatData.from_options(
@@ -475,23 +648,15 @@ class FarmsSimulatorExtension(WorkflowExtension):
         # Controller
         self.animat_controller = TestController(
             joint_names=(
-                [
-                    joint['joint_name']
-                    for joint in self.animat_options['control']['motors']
-                    if ControlType.to_string(ControlType.POSITION) in joint['control_types']
-                ],
                 [],
-                [
-                    joint['joint_name']
-                    for joint in self.animat_options['control']['motors']
-                    if ControlType.to_string(ControlType.TORQUE) in joint['control_types']
-                ],
+                [],
+                [],
                 [],
                 [],
             ),
             muscles_names=[
                 muscle.name.lower()
-                for muscle in self.animat_options.control.hill_muscles
+                for muscle in self.animat_options.control.muscles
             ],
             max_torques=(
                 [],
@@ -533,7 +698,7 @@ class FarmsSimulatorExtension(WorkflowExtension):
                 try:
                     self.load_experiment()
                 except Exception as e:
-                    pylog.error("Unable to load the model")
+                    pylog.error(f"Unable to load the model {e}")
             if imgui.menu_item_simple("Reload"):
                 pass
             if imgui.menu_item_simple("Close"):

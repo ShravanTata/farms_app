@@ -7,13 +7,14 @@ import networkx as nx
 import numpy as np
 from farms_app.core.extension import CustomExtension
 from farms_app.core.window import BaseWindow
+from farms_app.utils import colors
 from farms_core import pylog
 from farms_core.io.yaml import read_yaml
 from farms_network.core.network import Network
 from farms_network.core.options import NetworkOptions
 from imgui_bundle import imgui, imgui_ctx, implot, implot3d
+from imgui_bundle import portable_file_dialogs as pfd
 from tqdm import tqdm
-from farms_app.utils import colors
 
 
 def rotate(vector, theta):
@@ -111,10 +112,10 @@ def add_plot(iteration, data):
     outputs = np.vstack(
         (
             *[
-                data.nodes[plot_nodes[j]].output.array
+                data.nodes[plot_nodes[j]].output.values
                 for j in range(len(plot_nodes))
             ],
-            data.nodes[plot_nodes[-1]].external_input.array,
+            data.nodes[plot_nodes[-1]].external_input.values,
         )
     )
     if iteration < 1000:
@@ -149,86 +150,85 @@ def add_plot(iteration, data):
         "right_hind_RG_F": imgui.IM_COL32(200, 38, 39, 255),
         "left_hind_RG_F": imgui.IM_COL32(255, 252, 212, 255), #  imgui.IM_COL32(0, 0, 0, 255),
     }
-    with imgui_ctx.begin("States"):
-        if implot.begin_subplots(
-                "Network Activity",
-                3,
-                1,
-                imgui.ImVec2(-1, -1),
-                row_col_ratios=implot.SubplotsRowColRatios(row_ratios=[0.1, 0.8, 0.1], col_ratios=[1])
-        ):
-            if implot.begin_plot(""):
-                flags = (
-                    implot.AxisFlags_.no_label | implot.AxisFlags_.no_tick_labels | implot.AxisFlags_.no_tick_marks
+    if implot.begin_subplots(
+            "Network Activity",
+            3,
+            1,
+            imgui.ImVec2(-1, -1),
+            row_col_ratios=implot.SubplotsRowColRatios(row_ratios=[0.1, 0.8, 0.1], col_ratios=[1])
+    ):
+        if implot.begin_plot(""):
+            flags = (
+                implot.AxisFlags_.no_label | implot.AxisFlags_.no_tick_labels | implot.AxisFlags_.no_tick_marks
+            )
+            implot.setup_axis(implot.ImAxis_.y1, "Drive")
+            implot.setup_axis(implot.ImAxis_.x1, flags=flags)
+            implot.setup_axis_links(implot.ImAxis_.x1, implot.BoxedValue(-1.0), implot.BoxedValue(0.0))
+            implot.setup_axis_limits(implot.ImAxis_.x1, -1.0, 0.0)
+            implot.setup_axis_limits(implot.ImAxis_.y1, 0.0, 1.5)
+            implot.setup_axis_limits_constraints(implot.ImAxis_.x1, -1.0, 0.0)
+            implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0.0, 1.5)
+            implot.plot_line("RG-F-Dr", times, plot_data[-1, :])
+            implot.end_plot()
+        if implot.begin_plot(""):
+            implot.setup_axis(implot.ImAxis_.y1, "Activity")
+            implot.setup_axis(
+                implot.ImAxis_.x1,
+                flags=(
+                    implot.AxisFlags_.no_tick_labels |
+                    implot.AxisFlags_.no_tick_marks
                 )
-                implot.setup_axis(implot.ImAxis_.y1, "Drive")
-                implot.setup_axis(implot.ImAxis_.x1, flags=flags)
-                implot.setup_axis_links(implot.ImAxis_.x1, implot.BoxedValue(-1.0), implot.BoxedValue(0.0))
+            )
+            implot.setup_axis_links(implot.ImAxis_.x1, implot.BoxedValue(-1.0), implot.BoxedValue(0.0))
+            implot.setup_axis_limits(implot.ImAxis_.y1, -1*len(plot_names), 1.0)
+            implot.setup_axis_limits_constraints(implot.ImAxis_.x1, -1.0, 0.0)
+            implot.setup_axis_limits_constraints(implot.ImAxis_.y1, -8.2, 1.0)
+            implot.setup_axis_ticks(
+                axis=implot.ImAxis_.y1,
+                v_min=-8.0,
+                v_max=0.0,
+                n_ticks=int(len(plot_names[:-1])),
+                labels=(plot_labels[:-1])[::-1],
+                keep_default=False
+            )
+            for j in range(len(plot_nodes[:-1])):
+                if plot_names[j] in colors:
+                    implot.push_style_color(implot.Col_.line, colors.get(plot_names[j]))
+                    implot.plot_line(plot_names[j], times, plot_data[j, :] - j)
+                    implot.pop_style_color()
+                else:
+                    implot.plot_line(plot_names[j], times, plot_data[j, :] - j)
+            implot.end_plot()
+        if len(plot_nodes) > 7:
+            if implot.begin_plot("", flags=implot.Flags_.no_legend):
                 implot.setup_axis_limits(implot.ImAxis_.x1, -1.0, 0.0)
-                implot.setup_axis_limits(implot.ImAxis_.y1, 0.0, 1.5)
+                implot.setup_axis_limits(implot.ImAxis_.y1, 0.0, 4.0)
                 implot.setup_axis_limits_constraints(implot.ImAxis_.x1, -1.0, 0.0)
-                implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0.0, 1.5)
-                implot.plot_line("RG-F-Dr", times, plot_data[-1, :])
-                implot.end_plot()
-            if implot.begin_plot(""):
-                implot.setup_axis(implot.ImAxis_.y1, "Activity")
-                implot.setup_axis(
-                    implot.ImAxis_.x1,
-                    flags=(
-                        implot.AxisFlags_.no_tick_labels |
-                        implot.AxisFlags_.no_tick_marks
-                    )
-                )
-                implot.setup_axis_links(implot.ImAxis_.x1, implot.BoxedValue(-1.0), implot.BoxedValue(0.0))
-                implot.setup_axis_limits(implot.ImAxis_.y1, -1*len(plot_names), 1.0)
-                implot.setup_axis_limits_constraints(implot.ImAxis_.x1, -1.0, 0.0)
-                implot.setup_axis_limits_constraints(implot.ImAxis_.y1, -8.2, 1.0)
+                implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0.0, 4.0)
+                implot.setup_axis(implot.ImAxis_.y1, flags=implot.AxisFlags_.invert)
                 implot.setup_axis_ticks(
                     axis=implot.ImAxis_.y1,
-                    v_min=-8.0,
-                    v_max=0.0,
-                    n_ticks=int(len(plot_names[:-1])),
-                    labels=(plot_labels[:-1])[::-1],
+                    v_min=0.5,
+                    v_max=3.5,
+                    n_ticks=int(4),
+                    labels=("RF", "LF", "RH", "LH"),
                     keep_default=False
                 )
-                for j in range(len(plot_nodes[:-1])):
-                    if plot_names[j] in colors:
-                        implot.push_style_color(implot.Col_.line, colors.get(plot_names[j]))
-                        implot.plot_line(plot_names[j], times, plot_data[j, :] - j)
-                        implot.pop_style_color()
-                    else:
-                        implot.plot_line(plot_names[j], times, plot_data[j, :] - j)
-                implot.end_plot()
-            if len(plot_nodes) > 7:
-                if implot.begin_plot("", flags=implot.Flags_.no_legend):
-                    implot.setup_axis_limits(implot.ImAxis_.x1, -1.0, 0.0)
-                    implot.setup_axis_limits(implot.ImAxis_.y1, 0.0, 4.0)
-                    implot.setup_axis_limits_constraints(implot.ImAxis_.x1, -1.0, 0.0)
-                    implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0.0, 4.0)
-                    implot.setup_axis(implot.ImAxis_.y1, flags=implot.AxisFlags_.invert)
-                    implot.setup_axis_ticks(
-                        axis=implot.ImAxis_.y1,
-                        v_min=0.5,
-                        v_max=3.5,
-                        n_ticks=int(4),
-                        labels=("RF", "LF", "RH", "LH"),
-                        keep_default=False
+                for j, limb in enumerate(("RF", "LF", "RH", "LH")):
+                    # if len(phases_xs[j]) > 3:
+                    implot.push_style_color(
+                        implot.Col_.fill,
+                        colors[limb]
                     )
-                    for j, limb in enumerate(("RF", "LF", "RH", "LH")):
-                        # if len(phases_xs[j]) > 3:
-                        implot.push_style_color(
-                            implot.Col_.fill,
-                            colors[limb]
-                        )
-                        implot.plot_shaded(
-                            limb,
-                            phases_xs[j].flatten(),
-                            phases_ys[j].flatten(),
-                            yref=j
-                        )
-                        implot.pop_style_color()
-                    implot.end_plot()
-            implot.end_subplots()
+                    implot.plot_shaded(
+                        limb,
+                        phases_xs[j].flatten(),
+                        phases_ys[j].flatten(),
+                        yref=j
+                    )
+                    implot.pop_style_color()
+                implot.end_plot()
+        implot.end_subplots()
 
 
 def draw_muscle_activity(iteration, data, plot_nodes, plot_names, title):
@@ -637,7 +637,7 @@ def draw_slider(
 def draw_table(network_options, network_data):
     """ Draw table """
     flags = (
-        imgui.TableFlags_.borders | imgui.TableFlags_.row_bg | imgui.TableFlags_.resizable | \
+        imgui.TableFlags_.borders | imgui.TableFlags_.row_bg | imgui.TableFlags_.resizable |
         imgui.TableFlags_.sortable
     )
     with imgui_ctx.begin("Table"):
@@ -657,7 +657,8 @@ def draw_table(network_options, network_data):
                 imgui.text(edges[row].target)
                 imgui.table_set_column_index(2)
                 imgui.push_id(row)
-                _, weights[row] = imgui.input_float("##row", weights[row])
+                # imgui.input_float("##row", weights[row])
+                _, weights[row] = imgui.slider_float("##row", weights[row], -10.0, 10.0)
                 imgui.pop_id()
             imgui.end_table()
 
@@ -704,13 +705,11 @@ class NetworkExtension(CustomExtension):
         name = "Network"
         super().__init__(name=name)
 
-        network_options = NetworkOptions.from_options(
-            read_yaml("/tmp/network.yaml")
-        )
-
-        self.network = Network.from_options(network_options)
-        self.network.setup_integrator()
+        self.network = None
         self.time = 0.0
+
+        self.register_window(NetworkVisualizerWindow(self))
+        self.register_window(NetworkPlotWindow(self))
 
         # # Integrate
         # self.N_ITERATIONS = self.network_options.integration.n_iterations
@@ -790,25 +789,43 @@ class NetworkExtension(CustomExtension):
         #         bs_dr = index
         # self.iteration = 0
         # self.buffer_iteration = 0
-        self.drive_index = [
-            index
-            for index, node in enumerate(network_options.nodes)
-            if "BS_input" in node.name and node.model == "relay"
-        ][0]
-
-        self.register_window(NetworkVisualizerWindow(self))
 
     def on_update(self):
-        self.network.data.external_inputs.array[self.drive_index] = 0.5
-        self.network.step(self.time)
-        self.network.update_logs(self.time)
-        self.time += 1
+        if self.network:
+            if (self.time < self.network.options.integration.n_iterations):
+                self.network.step(self.time)
+                self.network.update_logs(self.time)
+                self.time += 1
+
+    def render_menu(self):
+        """ Render menu """
+        imgui.begin_menu_bar()
+        if imgui.begin_menu("File"):
+            if imgui.menu_item_simple("Config"):
+                result = pfd.open_file("Network config", filters=["*.yaml",]).result()
+                if result:
+                    try:
+                        network_options = NetworkOptions.from_options(read_yaml(result[0]))
+                        self.network = None
+                    except KeyError:
+                        pylog.error(f"Invalid network config {result[0]}")
+                        raise KeyError
+
+                    self.network = Network.from_options(network_options)
+                    if self.network:
+                        self.network.setup_integrator()
+                        self.time = 0.0
+                        self.windows[1].initialize()
+                        self.windows[2].initialize()
+            imgui.end_menu()
+        imgui.end_menu_bar()
 
     def get_name(self) -> str:
         return "Network"
 
     def cleanup(self):
         """ Cleanup  """
+        implot.plot_line
         pass
 
     def get_dependencies(self):
@@ -847,6 +864,26 @@ class NetworkExtension(CustomExtension):
     #     imgui.end()
 
 
+class NetworkPlotWindow(BaseWindow):
+
+    def __init__(self, extension, network: Network = None):
+        name: str = "plot"
+        super().__init__(name, extension)
+
+    def on_initialize(self):
+        """ On initialize """
+        self.iteration = 0
+        self.network = self._extension.network
+
+    def on_update(self):
+        """ On update of the application """
+
+    def on_render(self):
+        """ Render main extension dockspace """
+        add_plot(self.iteration, self.network.log)
+        self.iteration += 1
+
+
 class NetworkVisualizerWindow(BaseWindow):
 
     def __init__(self, extension, network: Network = None):
@@ -882,7 +919,7 @@ class NetworkVisualizerWindow(BaseWindow):
         self.edges_x = np.array(edges_xy[:, 0])
         self.edges_y = np.array(edges_xy[:, 1])
 
-    def draw_node2(self, draw_list, pos, radius, color_fill):
+    def draw_node2(self, name, draw_list, pos, radius, color_fill):
       r = style.node_radius
       shadow_dx, shadow_dy = style.node_shadow_offset
 
@@ -891,6 +928,16 @@ class NetworkVisualizerWindow(BaseWindow):
       col_border = col32(style.col_border_dark)
       col_shadow = col32((*style.col_shadow, style.node_shadow_alpha))
       col_highlight = col32((*style.col_highlight, style.node_highlight_alpha))
+
+      if imgui.is_mouse_hovering_rect(
+              imgui.ImVec2((pos[0] - radius, pos[1] - radius)),
+              imgui.ImVec2((pos[0] + radius, pos[1] + radius))
+      ):
+        imgui.begin_tooltip()
+        imgui.text(f"Neuron: {name}")
+        imgui.text(f"Type: ....")
+        # imgui.text_colored(f"Index: {i}", 0.8, 0.8, 0.3, 1)
+        imgui.end_tooltip()
 
       # soft shadow
       draw_list.add_circle_filled(
@@ -931,7 +978,20 @@ class NetworkVisualizerWindow(BaseWindow):
 
     def on_render(self):
         """ Render main extension dockspace """
-        imgui.text("Inside a dock host")
+        # _, self.network.data.nodes['BS_input'].external_input.values = imgui.slider_float(
+        #     "Drive",
+        #     self.network.data.nodes['BS_input'].external_input.values,
+        #     0.0,
+        #     1.5,
+        # )
+        _, self.network.data.nodes['BS_input_right'].external_input.values = imgui.slider_float(
+            "Drive Right",
+            self.network.data.nodes['BS_input_right'].external_input.values,
+            0.0,
+            1.5,
+        )
+        imgui.text(f"Time = {self._extension.time}")
+        draw_table(self.network.options, self.network.data)
         self.draw_network()
 
     def draw_network(self):
@@ -940,9 +1000,13 @@ class NetworkVisualizerWindow(BaseWindow):
       flags = (
           implot.AxisFlags_.no_label |
           implot.AxisFlags_.no_tick_labels |
-          implot.AxisFlags_.no_tick_marks
+          implot.AxisFlags_.no_tick_marks |
+          implot.AxisFlags_.no_grid_lines
       )
-      if implot.begin_plot("vis", size=(-1, -1), flags=implot.Flags_.equal):
+      if implot.begin_plot(
+              "vis", size=(-1, -1),
+              flags=implot.Flags_.equal
+      ):
 
           implot.setup_axis(implot.ImAxis_.x1, flags=flags)
           implot.setup_axis(implot.ImAxis_.y1, flags=flags)
@@ -959,7 +1023,7 @@ class NetworkVisualizerWindow(BaseWindow):
           draw_list = implot.get_plot_draw_list()
           implot.push_plot_clip_rect()
           # safe to draw, nothing leaks outside plot
-          self.draw_bezier_connection(draw_list, colors.COLORS['edge'])
+          self.draw_bezier_connection(draw_list, colors.COLORS['edge_strong'])
           implot.pop_plot_clip_rect()
 
           for index, node in enumerate(nodes):
@@ -968,9 +1032,10 @@ class NetworkVisualizerWindow(BaseWindow):
               implot.push_plot_clip_rect()
               # safe to draw, nothing leaks outside plot
               self.draw_node2(
-                  draw_list, p1, 20, colors.rgb_u32(
-                      *colors._RAW_COLORS['pastel_yellow'],
-                      a=10*255*self.network.data.outputs.array[index])
+                  node.name, draw_list, p1, 20, colors.rgb_u32(
+                      *colors._RAW_COLORS['pastel_red'],
+                      a=self.network.data.outputs.array[index]*3.0
+                  )
               )
               draw_list.add_text(p1, colors.COLORS['edge'], node.visual['label'].replace("\\textsubscript", "")[0])
               implot.pop_plot_clip_rect()
@@ -1006,8 +1071,7 @@ class NetworkVisualExtension(CustomExtension):
 
         # run network
         self.network_options = NetworkOptions.from_options(
-            # read_yaml("/Users/tatarama/projects/work/farms/farms_network/examples/mouse/config/central_network.yaml")
-            read_yaml("/tmp/network.yaml")
+            read_yaml("/Users/tatarama/projects/work/research/neuromechanics/quadruped/mice/mouse-locomotion/data/config/muscles/quadruped_siggraph.yaml")
         )
 
         edges_xy = np.array(

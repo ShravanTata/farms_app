@@ -47,12 +47,26 @@ _mjGEOMSTRING = (
 class MuJoCoWindow(BaseWindow):
     """ MuJoCo Window """
 
-    def __init__(self, extension):
+    def __init__(self, extension, window_size = (1280, 720)):
         name: str = "MuJoCo"
         super().__init__(name, extension)
         self._io = imgui.get_io()
         self.model = None
         self.data = None
+        self.width, self.height = window_size[0], window_size[1]
+
+        self.framebuffer = None
+        self.depth_buffer = None
+        self.texture_id = None
+
+        # MjScene
+        self.mj_camera = None
+        self.mj_option = None
+        self.mj_perturb = None
+        self.mj_viewport = None
+        self.mj_scene = None
+
+        self.is_scene_hovered = False
 
     def on_initialize(self):
         """ Initialize """
@@ -68,70 +82,134 @@ class MuJoCoWindow(BaseWindow):
                 if self.result:
                     self.model = mujoco.MjModel.from_xml_path(self.result[0])
                     self.data = mujoco.MjData(self.model)
-                    self.setup_simulation()
+                    # Setup mujoco scene
+                    self.setup_mj_scene()
 
-    def setup_simulation(self):
-        self.camera = mujoco.MjvCamera()
-        self.option = mujoco.MjvOption()
-        self.option.flags[mujoco.mjtVisFlag.mjVIS_LIGHT] = True
+                    (self.msaa_fbo,
+                     self.resolve_fbo,
+                     self.resolve_texture,
+                     self.msaa_color_rb,
+                     self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height, 4)
+
+    def setup_mj_scene(self):
+        self.mj_camera = mujoco.MjvCamera()
+        self.mj_option = mujoco.MjvOption()
+        self.mj_option.flags[mujoco.mjtVisFlag.mjVIS_LIGHT] = True
         self.model.vis.headlight.ambient[:] = [0.6]*3
         self.model.vis.headlight.diffuse[:] = [0.4]*3
         self.model.vis.headlight.specular[:] = [0.5]*3
-        self.perturb = mujoco.MjvPerturb()
-        mujoco.mjv_defaultCamera(self.camera)
-        mujoco.mjv_defaultPerturb(self.perturb)
-        mujoco.mjv_defaultOption(self.option)
+        self.mj_perturb = mujoco.MjvPerturb()
+        mujoco.mjv_defaultCamera(self.mj_camera)
+        mujoco.mjv_defaultPerturb(self.mj_perturb)
+        mujoco.mjv_defaultOption(self.mj_option)
         self.mj_context = mujoco.MjrContext(self.model, mujoco.mjtFontScale.mjFONTSCALE_150)
-        self.scene = mujoco.MjvScene(self.model, maxgeom=1000000)
+        mujoco.mjr_setBuffer(mujoco.mjtFramebuffer.mjFB_OFFSCREEN, self.mj_context)  # <-- added
+        self.mj_scene = mujoco.MjvScene(self.model, maxgeom=1000000)
+        self.mj_viewport = mujoco.MjrRect(0, 0, 0, 0)
+        self.mj_viewport.width, self.mj_viewport.height = self.width, self.height
 
-        self.viewport = mujoco.MjrRect(0, 0, 0, 0)
-        self.width, self.height = 1280, 720
-        self.max_width, self.max_height = 1920, 1080
-        self.viewport.width, self.viewport.height = self.width, self.height
-        self.framebuffer = None
-        self.depth_buffer = None
-        self.texture_id = None
-        self.create_framebuffer(self.width, self.height)
 
-        self.start_time = self.data.time
+    @staticmethod
+    def create_framebuffer(width: int, height: int, samples: int = 4):
+        """
+        Create MSAA framebuffer for MuJoCo rendering + resolve framebuffer for ImGui.
+        Returns:
+        msaa_fbo, resolve_fbo, resolve_texture, msaa_color_rb, msaa_depth_rb
+        """
 
-    def create_framebuffer(self, width: int, height: int):
-        """ Create Framebuffer """
-        self.texture_id = GL.glGenTextures(1)
+        # -------------------------
+        # MSAA framebuffer (render target)
+        # -------------------------
+        msaa_fbo = GL.glGenFramebuffers(1)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, msaa_fbo)
 
-        GL.glBindTexture(GL.GL_TEXTURE_2D, self.texture_id)
-        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, width, height, 0,
-                        GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None)
-        # Set texture parameters
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
+        # Multisampled color renderbuffer
+        msaa_color_rb = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_color_rb)
+        GL.glRenderbufferStorageMultisample(
+            GL.GL_RENDERBUFFER,
+            samples,
+            GL.GL_RGBA8,
+            width,
+            height,
+        )
+        GL.glFramebufferRenderbuffer(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_COLOR_ATTACHMENT0,
+            GL.GL_RENDERBUFFER,
+            msaa_color_rb,
+        )
+
+        # Multisampled depth renderbuffer
+        msaa_depth_rb = GL.glGenRenderbuffers(1)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_depth_rb)
+        GL.glRenderbufferStorageMultisample(
+            GL.GL_RENDERBUFFER,
+            samples,
+            GL.GL_DEPTH_COMPONENT24,
+            width,
+            height,
+        )
+        GL.glFramebufferRenderbuffer(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_DEPTH_ATTACHMENT,
+            GL.GL_RENDERBUFFER,
+            msaa_depth_rb,
+        )
+
+        if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
+            raise RuntimeError("MSAA framebuffer is not complete")
+
+        # -------------------------
+        # Resolve framebuffer (texture for ImGui)
+        # -------------------------
+        resolve_fbo = GL.glGenFramebuffers(1)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, resolve_fbo)
+
+        resolve_texture = GL.glGenTextures(1)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, resolve_texture)
+
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D,
+            0,
+            GL.GL_RGBA8,       # was GL_SRGB8_ALPHA8
+            width,
+            height,
+            0,
+            GL.GL_RGBA,
+            GL.GL_UNSIGNED_BYTE,
+            None,
+        )
+
+        # Use nearest to avoid ImGui-induced blur
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
         GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
 
-        # Create framebuffer
-        self.framebuffer = GL.glGenFramebuffers(1)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
+        GL.glFramebufferTexture2D(
+            GL.GL_FRAMEBUFFER,
+            GL.GL_COLOR_ATTACHMENT0,
+            GL.GL_TEXTURE_2D,
+            resolve_texture,
+            0,
+        )
 
-        # Attach texture to framebuffer
-        GL.glFramebufferTexture2D(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
-                                  GL.GL_TEXTURE_2D, self.texture_id, 0)
-
-        # Create depth buffer
-        self.depth_buffer = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self.depth_buffer)
-        GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_DEPTH_COMPONENT24,
-                                 self.width, self.height)
-        GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT,
-                                    GL.GL_RENDERBUFFER, self.depth_buffer)
-
-        # Check framebuffer completeness
         if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
-            pylog.error("Framebuffer not complete!")
+            raise RuntimeError("Resolve framebuffer is not complete")
 
-        # GL.glEnable(GL.GL_MULTISAMPLE)
-
-        # unbind framebuffer
+        # Unbind
         GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, 0)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+
+        return (
+            msaa_fbo,
+            resolve_fbo,
+            resolve_texture,
+            msaa_color_rb,
+            msaa_depth_rb,
+        )
 
     def resize_framebuffer(self, width, height):
         # Delete old OpenGL resources
@@ -140,9 +218,16 @@ class MuJoCoWindow(BaseWindow):
         GL.glDeleteFramebuffers(1, [self.framebuffer])
 
         # Recreate them with new size
-        self.viewport.width, self.viewport.height = width, height
+        self.mj_viewport.width, self.mj_viewport.height = width, height
 
-        self.create_framebuffer(self.width, self.height)
+        # self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
+        #     self.width, self.height
+        # )
+        (self.msaa_fbo,
+        self.resolve_fbo,
+        self.resolve_texture,
+        self.msaa_color_rb,
+        self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height)
 
     def run_simulation(self):
         """ Run Simulation """
@@ -153,23 +238,35 @@ class MuJoCoWindow(BaseWindow):
         avail = imgui.get_content_region_avail()
         render_w, render_h = int(avail.x), int(avail.y)
 
-        # Bind framebuffer
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.framebuffer)
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.msaa_fbo)
         GL.glViewport(0, 0, self.width, self.height)
-        self.viewport.width = self.width
-        self.viewport.height = self.height
-        # update MuJoCo camera aspect
 
-        # Minimal OpenGL setup - let MuJoCo handle lighting
-        # GL.glEnable(GL.GL_DEPTH_TEST)
-        # GL.glEnable(GL.GL_FRAMEBUFFER_SRGB)
-        GL.glClearColor(0.1, 0.1, 0.1, 1.0)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glClearColor(1.0, 1.0, 1.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
-        # Update and render
-        mujoco.mjv_updateScene(self.model, self.data, self.option, None, self.camera,
-                              mujoco.mjtCatBit.mjCAT_ALL, self.scene)
-        mujoco.mjr_render(self.viewport, self.scene, self.mj_context)
+        mujoco.mjv_updateScene(
+            self.model, self.data, self.mj_option, None, self.mj_camera,
+            mujoco.mjtCatBit.mjCAT_ALL, self.mj_scene
+        )
+        mujoco.mjr_render(self.mj_viewport, self.mj_scene, self.mj_context)
+
+        try:
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        except GL.GLError:
+            pass
+
+        GL.glDisable(GL.GL_DEPTH_TEST)
+
+        # Blit MSAA -> resolve (no sRGB toggling, nearest filter for 1:1 blit)
+        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.msaa_fbo)
+        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.resolve_fbo)
+        GL.glBlitFramebuffer(
+            0, 0, self.width, self.height,
+            0, 0, self.width, self.height,
+            GL.GL_COLOR_BUFFER_BIT,
+            GL.GL_NEAREST,  # was GL_LINEAR
+        )
         try:
             # Exception handling necessary for Nvidia + Wayland
             GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
@@ -190,12 +287,11 @@ class MuJoCoWindow(BaseWindow):
             draw_width = avail_width
             draw_height = draw_width / target_aspect
 
-        imgui.image_with_bg(
-            self.texture_id,
-            imgui.ImVec2((self.width, self.height)),
-            uv0=imgui.ImVec2((1,1)),
-            uv1=imgui.ImVec2((0,0)),
-            bg_col=imgui.ImVec4((0, 0, 1, 1))
+        imgui.image(
+            imgui.ImTextureRef(self.resolve_texture),
+            imgui.ImVec2((draw_width, draw_height)),
+            uv0=imgui.ImVec2((1, 1)),
+            uv1=imgui.ImVec2((0, 0)),
         )
 
         if imgui.is_item_hovered():
@@ -215,9 +311,9 @@ class MuJoCoWindow(BaseWindow):
 
     def keyboard_interactions(self):
         """ keyboard interactions """
-        self.__mj_keys(mujoco.mjRNDSTRING, self.scene.flags)
-        self.__mj_keys(mujoco.mjVISSTRING, self.option.flags)
-        self.__mj_keys(_mjGEOMSTRING, self.option.geomgroup)
+        self.__mj_keys(mujoco.mjRNDSTRING, self.mj_scene.flags)
+        self.__mj_keys(mujoco.mjVISSTRING, self.mj_option.flags)
+        self.__mj_keys(_mjGEOMSTRING, self.mj_option.geomgroup)
 
     def mouse_iteractions(self):
         """ Mouse interactions """
@@ -230,16 +326,16 @@ class MuJoCoWindow(BaseWindow):
                 mujoco.mjtMouse.mjMOUSE_ROTATE_H,
                 -mouse_delta.x / self.width,
                 0.0,
-                self.scene,
-                self.camera,
+                self.mj_scene,
+                self.mj_camera,
             )
             mujoco.mjv_moveCamera(
                 self.model,
                 mujoco.mjtMouse.mjMOUSE_ROTATE_V,
                 0.0,
                 mouse_delta.y / self.height,
-                self.scene,
-                self.camera,
+                self.mj_scene,
+                self.mj_camera,
             )
         elif imgui.is_key_down(imgui.Key.mouse_right):
             mujoco.mjv_moveCamera(
@@ -247,16 +343,16 @@ class MuJoCoWindow(BaseWindow):
                 mujoco.mjtMouse.mjMOUSE_MOVE_H,
                 -mouse_delta.x / self.width,
                 0.0,
-                self.scene,
-                self.camera,
+                self.mj_scene,
+                self.mj_camera,
             )
             mujoco.mjv_moveCamera(
                 self.model,
                 mujoco.mjtMouse.mjMOUSE_MOVE_V,
                 0.0,
                 mouse_delta.y / self.height,
-                self.scene,
-                self.camera,
+                self.mj_scene,
+                self.mj_camera,
             )
         elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
             mujoco.mjv_moveCamera(
@@ -264,8 +360,8 @@ class MuJoCoWindow(BaseWindow):
                 mujoco.mjtMouse.mjMOUSE_ZOOM,
                 0.0,
                 np.sign(mouse_wheel)*0.05*1,
-                self.scene,
-                self.camera,
+                self.mj_scene,
+                self.mj_camera,
             )
 
 
