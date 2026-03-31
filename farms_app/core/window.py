@@ -86,6 +86,11 @@ class Window(Generic[E]):
 
     def _render(self) -> None:
         """Internal render call — wraps on_render() in imgui.begin()/end()."""
+
+        # Return if window is hidden
+        if not self._visible:
+            return
+
         imgui.set_next_window_size(imgui.ImVec2(400, 300), imgui.Cond_.first_use_ever)
         expanded, self._visible = imgui.begin(
             self._window_id,
