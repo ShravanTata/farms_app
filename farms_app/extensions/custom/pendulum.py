@@ -1,15 +1,16 @@
-import time
-from farms_app.core.widget import SimulationToolbar, PlaybackState
 import importlib
 import os
+import time
 import traceback
 
 import mujoco
 import numpy as np
 import OpenGL.GL as GL
 from dm_control.rl.control import PhysicsError
-from farms_app.core.extension import CustomExtension, WorkflowExtension
-from farms_app.core.window import BaseWindow
+from farms_app.backends.renderer.gl_framebuffer import MSAAFramebuffer
+from farms_app.core.extension import Extension
+from farms_app.core.widget import PlaybackState, SimulationToolbar
+from farms_app.core.window import Window
 from farms_app.utils import colors
 from farms_core import pylog
 from farms_core.experiment.options import ExperimentOptions
@@ -31,8 +32,6 @@ from farms_network.core.options import NetworkOptions
 from farms_sim.simulation import run_simulation, simulation_setup
 from imgui_bundle import imgui, imgui_ctx, implot, implot3d
 from imgui_bundle import portable_file_dialogs as pfd
-
-pylog.set_level("error")
 
 
 MJ_IMGUI_KEYMAP = {
@@ -173,7 +172,7 @@ class DiagramStyle:
 style = DiagramStyle()
 
 
-class NetworkVisualizerWindow(BaseWindow):
+class NetworkVisualizerWindow(Window):
 
     def __init__(self, extension, network: Network = None):
         name: str = "visualizer"
@@ -408,7 +407,7 @@ class NetworkVisualizerWindow(BaseWindow):
             implot.end_plot()
 
 
-class AnalysisWindow(BaseWindow):
+class AnalysisWindow(Window):
     """ FARMS Analysis Window """
 
     def __init__(
@@ -746,7 +745,7 @@ class AnalysisWindow(BaseWindow):
             # implot.end_subplots()
 
 
-class MuJoCoWindow(BaseWindow):
+class MuJoCoWindow(Window):
     """ MuJoCo Window """
 
     def __init__(
@@ -786,22 +785,13 @@ class MuJoCoWindow(BaseWindow):
         self.setup_mj_scene()
 
         # Create framebuffer
-        (self.msaa_fbo,
-        self.resolve_fbo,
-        self.resolve_texture,
-        self.msaa_color_rb,
-        self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height, 4)
+        self.fb = MSAAFramebuffer(self.width, self.height, samples=4)
 
     def render_main_scene(self):
 
         self._viewer_pos = imgui.get_cursor_screen_pos()
 
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self.msaa_fbo)
-        GL.glViewport(0, 0, self.width, self.height)
-
-        GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glClearColor(1.0, 1.0, 1.0, 1.0)
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+        self.fb.bind()
 
         mujoco.mjv_updateScene(
             self.model,
@@ -814,23 +804,8 @@ class MuJoCoWindow(BaseWindow):
         )
         mujoco.mjr_render(self.mj_viewport, self.mj_scene, self.mj_context)
 
-        try:
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        except GL.GLError:
-            pass
-
-        GL.glDisable(GL.GL_DEPTH_TEST)
-
-        # Blit MSAA -> resolve (no sRGB toggling, nearest filter for 1:1 blit)
-        GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self.msaa_fbo)
-        GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, self.resolve_fbo)
-        GL.glBlitFramebuffer(
-            0, 0, self.width, self.height,
-            0, 0, self.width, self.height,
-            GL.GL_COLOR_BUFFER_BIT,
-            GL.GL_NEAREST,  # was GL_LINEAR
-        )
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        self.fb.unbind()
+        self.fb.resolve()
 
         avail_width, avail_height = imgui.get_content_region_avail()
         if avail_width <= 0 or avail_height <= 0:
@@ -846,7 +821,7 @@ class MuJoCoWindow(BaseWindow):
             draw_height = draw_width / target_aspect
 
         imgui.image(
-            imgui.ImTextureRef(self.resolve_texture),
+            imgui.ImTextureRef(self.fb.texture_id),
             imgui.ImVec2((draw_width, draw_height)),
             uv0=imgui.ImVec2((1, 1)),
             uv1=imgui.ImVec2((0, 0)),
@@ -877,128 +852,8 @@ class MuJoCoWindow(BaseWindow):
         self.mj_viewport.width, self.mj_viewport.height = self.width, self.height
         self.mj_scene.flags[mujoco.mjtRndFlag.mjRND_SKYBOX] = True
         self.mj_scene.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = True
-        self.mj_scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = True
+        self.mj_scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = False
         # self.mj_option.flags[mujoco.mjtVisFlag.mjVIS_SKYBOX] = True
-
-    @staticmethod
-    def create_framebuffer(width: int, height: int, samples: int = 4):
-        """
-        Create MSAA framebuffer for MuJoCo rendering + resolve framebuffer for ImGui.
-        Returns:
-        msaa_fbo, resolve_fbo, resolve_texture, msaa_color_rb, msaa_depth_rb
-        """
-
-        # -------------------------
-        # MSAA framebuffer (render target)
-        # -------------------------
-        msaa_fbo = GL.glGenFramebuffers(1)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, msaa_fbo)
-
-        # Multisampled color renderbuffer
-        msaa_color_rb = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_color_rb)
-        GL.glRenderbufferStorageMultisample(
-            GL.GL_RENDERBUFFER,
-            samples,
-            GL.GL_RGBA8,
-            width,
-            height,
-        )
-        GL.glFramebufferRenderbuffer(
-            GL.GL_FRAMEBUFFER,
-            GL.GL_COLOR_ATTACHMENT0,
-            GL.GL_RENDERBUFFER,
-            msaa_color_rb,
-        )
-
-        # Multisampled depth renderbuffer
-        msaa_depth_rb = GL.glGenRenderbuffers(1)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, msaa_depth_rb)
-        GL.glRenderbufferStorageMultisample(
-            GL.GL_RENDERBUFFER,
-            samples,
-            GL.GL_DEPTH_COMPONENT24,
-            width,
-            height,
-        )
-        GL.glFramebufferRenderbuffer(
-            GL.GL_FRAMEBUFFER,
-            GL.GL_DEPTH_ATTACHMENT,
-            GL.GL_RENDERBUFFER,
-            msaa_depth_rb,
-        )
-
-        if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
-            raise RuntimeError("MSAA framebuffer is not complete")
-
-        # -------------------------
-        # Resolve framebuffer (texture for ImGui)
-        # -------------------------
-        resolve_fbo = GL.glGenFramebuffers(1)
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, resolve_fbo)
-
-        resolve_texture = GL.glGenTextures(1)
-        GL.glBindTexture(GL.GL_TEXTURE_2D, resolve_texture)
-
-        GL.glTexImage2D(
-            GL.GL_TEXTURE_2D,
-            0,
-            GL.GL_RGBA8,       # was GL_SRGB8_ALPHA8
-            width,
-            height,
-            0,
-            GL.GL_RGBA,
-            GL.GL_UNSIGNED_BYTE,
-            None,
-        )
-
-        # Use nearest to avoid ImGui-induced blur
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
-
-        GL.glFramebufferTexture2D(
-            GL.GL_FRAMEBUFFER,
-            GL.GL_COLOR_ATTACHMENT0,
-            GL.GL_TEXTURE_2D,
-            resolve_texture,
-            0,
-        )
-
-        if GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER) != GL.GL_FRAMEBUFFER_COMPLETE:
-            raise RuntimeError("Resolve framebuffer is not complete")
-
-        # Unbind
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, 0)
-        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
-
-        return (
-            msaa_fbo,
-            resolve_fbo,
-            resolve_texture,
-            msaa_color_rb,
-            msaa_depth_rb,
-        )
-
-    def resize_framebuffer(self, width, height):
-        # Delete old OpenGL resources
-        GL.glDeleteTextures([self.texture_id])
-        GL.glDeleteRenderbuffers(1, [self.depth_buffer])
-        GL.glDeleteFramebuffers(1, [self.framebuffer])
-
-        # Recreate them with new size
-        self.mj_viewport.width, self.mj_viewport.height = width, height
-
-        # self.framebuffer, self.texture_id, self.depth_buffer = MuJoCoWindow.create_framebuffer(
-        #     self.width, self.height
-        # )
-        (self.msaa_fbo,
-        self.resolve_fbo,
-        self.resolve_texture,
-        self.msaa_color_rb,
-        self.msaa_depth_rb) = MuJoCoWindow.create_framebuffer(self.width, self.height)
 
     def run_simulation(self):
         """ Run Simulation """
@@ -1198,7 +1053,7 @@ class MuJoCoWindow(BaseWindow):
             )
 
 
-class PendulumExtension(CustomExtension):
+class PendulumExtension(Extension):
     """ FARMS Simulation """
 
     def __init__(self):
@@ -1207,7 +1062,7 @@ class PendulumExtension(CustomExtension):
         self._io = imgui.get_io()
         self.sim = None
         self.dt_remainder = 0.0
-        self.playback_speed = 1.0
+        self.playback_speed = 0.1
         self._last_update_time = time.perf_counter()
 
         # FARMS
@@ -1240,10 +1095,10 @@ class PendulumExtension(CustomExtension):
     def setup_simulation(self):
 
         # initialize data from options
-        self.animat_data = AnimatData.from_options(
-            animat_options=self.exp_options.animats[0],
-            simulation_options=self.exp_options.simulation,
-        )
+        # self.animat_data = AnimatData.from_options(
+        #     animat_options=self.exp_options.animats[0],
+        #     simulation_options=self.exp_options.simulation,
+        # )
 
         # Simulation
         self.sim = simulation_setup(
@@ -1272,10 +1127,9 @@ class PendulumExtension(CustomExtension):
     def get_dependencies(self):
         return []
 
-    def render_menu(self):
-        """ Render menu """
-        imgui.begin_menu_bar()
-        if imgui.begin_menu("File"):
+    def menu(self):
+        """ Extension menu in main menu bar """
+        if imgui.begin_menu("FARMS"):
             if imgui.menu_item_simple("Open"):
                 try:
                     self.load_experiment()
@@ -1285,19 +1139,19 @@ class PendulumExtension(CustomExtension):
                 pass
             if imgui.menu_item_simple("Close"):
                 pass
+            imgui.separator()
+            if imgui.begin_menu("Simulation"):
+                if imgui.menu_item_simple("Experiment"):
+                    pass
+                imgui.end_menu()
+            if imgui.begin_menu("Windows"):
+                for window in self.windows.values():
+                    if imgui.menu_item_simple(window.name, selected=window.visible):
+                        window.visible = not window.visible
+                imgui.end_menu()
             imgui.end_menu()
-        if imgui.begin_menu("Simulation"):
-            if imgui.menu_item_simple("Experiment"):
-                pass
-            imgui.end_menu()
-        if imgui.begin_menu("Window"):
-            for window in self.windows:
-                if imgui.menu_item_simple(window.name, selected=window.visible):
-                    window.visible = not window.visible
-            imgui.end_menu()
-        imgui.end_menu_bar()
 
-    def on_update(self):
+    def on_update(self, dt):
         # Normal GUI operation
         if self.sim:
             # dt = 1/120
@@ -1365,14 +1219,13 @@ class PendulumExtension(CustomExtension):
         if self.exp_options:
             self.setup_simulation()
             self.register_windows()
-            self.windows[1].initialize()
-            self.windows[2].initialize()
-            self.windows[3].initialize()
+            self.init_windows()
             self.exp_options = None
 
     def on_event(self):
         """ On events """
-        if len(self.windows) > 1:
-            if self.windows[1].is_scene_hovered:
-                self.windows[1].mouse_interactions()
-                self.windows[1].keyboard_interactions()
+        mujoco_win = self.windows.get("MuJoCo")
+        if mujoco_win and mujoco_win._initialized:
+            if mujoco_win.is_scene_hovered:
+                mujoco_win.mouse_interactions()
+                mujoco_win.keyboard_interactions()
