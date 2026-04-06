@@ -56,6 +56,26 @@ class ExtensionOptions(Options):
     def __init__(self, **kwargs):
         super().__init__()
         self.auto_load = kwargs.pop("auto_load", True)
+        self.state = kwargs.pop("state", {})
+
+
+class FontOptions(Options):
+    """ Font options """
+
+    def __init__(self, name: str, size: int):
+        super().__init__()
+        self.name = name
+        self.size = size
+
+    @classmethod
+    def defaults(cls, **kwargs):
+        """ Defaults """
+        name: str = kwargs.pop("name", "JetBrainsMono[wght].ttf")
+        size: int = kwargs.pop("size", 16)
+        return FontOptions(
+            name=name,
+            size=size
+        )
 
 
 class ApplicationOptions(Options):
@@ -100,6 +120,9 @@ class ApplicationOptions(Options):
 
         # Extensions to enable on startup
         self.auto_enable: list[str] = kwargs.pop("auto_enable", ["status_bar"])
+
+        # Font options
+        self.fonts: FontOptions = kwargs.pop("font_options", FontOptions.defaults())
 
 
 if __name__ == '__main__':
