@@ -1,33 +1,34 @@
 """ Main script to run the FARMS app """
 
+import time
 from typing import List
 
 # from farms_app.core.options import ApplicationOptions
 import numpy as np
+from farms_app.backends.base import BaseBackend
 from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
-from farms_app.backends.base import BaseBackend
 from farms_app.console import console
 from farms_app.core.extension import ExtensionManager
 from farms_app.core.profiler import FrameTimer
 from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui, implot
-import time
 
 from .options import ApplicationOptions
 
-pylog.set_level("error")
+_DEFAULT_OPTIONS_FILE = "options.yaml"
 
 
 class FARMSApplication:
     """FARMS Application """
 
-    def __init__(self, options: ApplicationOptions):
+    def __init__(self, options: ApplicationOptions, options_path: str = None):
         """Initialization"""
         super().__init__()
 
-        self._options = options
+        self._options: ApplicationOptions = options
+        self._options_path = options_path or _DEFAULT_OPTIONS_FILE
 
         # Setup backend
         self.backend: BaseBackend = None
@@ -86,13 +87,20 @@ class FARMSApplication:
         """ Initialize using options """
         return cls(options)
 
+    @classmethod
+    def from_file(cls, path: str = _DEFAULT_OPTIONS_FILE):
+        """Load options from YAML and initialize. Falls back to defaults."""
+        import os
+        if os.path.exists(path):
+            options = ApplicationOptions.load(path)
+            pylog.info(f"Loaded options from {path}")
+        else:
+            options = ApplicationOptions()
+        return cls(options, options_path=path)
+
     def render_menu(self):
         """ Render menu """
         imgui.begin_main_menu_bar()
-
-        # Extension menus (namespaced top-level menus)
-        for name, extension in self.extension_manager._enabled_exts.items():
-            extension.obj.menu()
 
         if imgui.begin_menu("View"):
             if imgui.begin_menu("Theme"):
@@ -135,6 +143,11 @@ class FARMSApplication:
                 elif clicked and not new_state:
                     self.extension_manager.disable(name)
             imgui.end_menu()
+
+        # Extension menus (namespaced top-level menus)
+        for name, extension in self.extension_manager._enabled_exts.items():
+            extension.obj.menu()
+
         imgui.end_main_menu_bar()
 
     def run(self):
