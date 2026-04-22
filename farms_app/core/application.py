@@ -43,9 +43,9 @@ class FARMSApplication:
         # Fonts — load JetBrains Mono with FontAwesome icons merged in
         from imgui_bundle import hello_imgui
         font_path = str(paths.get_project_root().joinpath(
-            "farms_app", "assets", "fonts", "JetBrainsMono[wght].ttf"
+            "farms_app", "assets", "fonts", options.fonts.name
         ))
-        hello_imgui.load_font_ttf_with_font_awesome_icons(font_path, 14)
+        hello_imgui.load_font_ttf_with_font_awesome_icons(font_path, options.fonts.size)
 
         # Setup extensions
         self.extension_manager = ExtensionManager()
