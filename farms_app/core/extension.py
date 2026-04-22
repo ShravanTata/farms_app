@@ -242,12 +242,18 @@ class Extension:
     def on_disable(self):
         """Called when extension is about to be disabled."""
 
+    def pre_update(self, dt: float):
+        """ Called to setup before on_update """
+
     def on_update(self, dt: float):
         """Called once per frame with frame delta time.
         Simulation stepping goes here. The extension decides how many
         steps to run based on dt — the framework does not own the
         simulation clock.
         """
+
+    def post_update(self, dt: float):
+        """ Called for any clean-up changes post on_update call """
 
     def on_event(self):
         """Called once per frame for input handling."""
