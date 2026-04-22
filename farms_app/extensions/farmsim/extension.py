@@ -1,0 +1,456 @@
+""" Main FARMSIM extension """
+from farms_app.console import console
+
+import os
+import time
+
+from farms_app.core.extension import Extension
+from farms_app.core.widget import PlaybackState, SimulationToolbar
+from farms_app.plots.data_registry import DataRegistry
+from farms_app.plots.plot_window import PlotWindow, PlotConfig, PlotWindowConfig
+from farms_app.extensions.farmsim.data_registry import build_registry
+from farms_app.core.config_editor import ConfigEditorWindow
+from farms_app.extensions.farmsim.windows.mujoco_viewport import MuJoCoViewportWindow
+from farms_app.extensions.farmsim.windows.network_visualizer import NetworkVisualizerWindow
+from farms_app.extensions.farmsim.windows.properties import PropertiesWindow
+from farms_core import pylog
+from farms_core.experiment.options import ExperimentOptions
+from farms_core.simulation.options import Simulator
+from farms_sim.simulation import simulation_setup
+from imgui_bundle import imgui
+from imgui_bundle import portable_file_dialogs as pfd
+
+
+# Default experiment path for development
+_DEV_EXPERIMENT = (
+    "/Users/tatarama/projects/work/research/neuromechanics"
+    "/misc/pendulum-fb/config/experiment.yaml"
+)
+
+
+class FARMSIMExtension(Extension):
+
+    def __init__(self):
+        super().__init__(name="FARMSIM")
+        self.sim = None
+        self.registry = DataRegistry()
+
+        # Playback
+        self.playback_state = PlaybackState.STOPPED
+        self.playback_speed = 1.0
+        self._dt_remainder = 0.0
+        self._last_update_time = time.perf_counter()
+        self._view_offset = 0  # 0 = live, negative = looking at history
+
+        # Toolbar
+        self.toolbar = SimulationToolbar()
+        self.toolbar.on_play = self._play
+        self.toolbar.on_pause = self._pause
+        self.toolbar.on_stop = self._stop
+        self.toolbar.on_step_fwd = lambda: self._step(1)
+        self.toolbar.on_step_back = lambda: self._step(-1)
+        self.toolbar.on_step_fwd_many = lambda: self._step(10)
+        self.toolbar.on_step_back_many = lambda: self._step(-10)
+        self.toolbar.on_speed_change = self._set_speed
+        self.toolbar.on_scrub = self._scrub
+
+        # Windows
+        self._mujoco_win = MuJoCoViewportWindow(self)
+        self.register_window(self._mujoco_win)
+        self._properties_win = PropertiesWindow(self)
+        self.register_window(self._properties_win)
+        self._config_win = ConfigEditorWindow(self, name="Config")
+        self.register_window(self._config_win)
+        self._network_vis_win = NetworkVisualizerWindow(self)
+        self.register_window(self._network_vis_win)
+
+    # ── Data accessors ────────────────────────────────────────────────
+
+    @property
+    def task(self):
+        """The simulation task, or None if no sim is loaded."""
+        if self.sim is None:
+            return None
+        return self.sim.task
+
+    @property
+    def farms_data(self):
+        """AnimatData for the first animat, or None."""
+        if self.sim is None:
+            return None
+        return self.sim.task.data.animats[0]
+
+    @property
+    def view_iteration(self):
+        """The iteration index for rendering (accounts for scrub offset)."""
+        if self.sim is None:
+            return 0
+        return self.task.iteration + self._view_offset
+
+    @property
+    def network(self):
+        """Network from the first task extension, or None."""
+        if self.sim is None:
+            return None
+        try:
+            return self.sim.task.extensions[0].network
+        except (IndexError, AttributeError):
+            return None
+
+    # ── Playback controls ─────────────────────────────────────────────
+
+    def _play(self):
+        if self.sim is None:
+            return
+        self.playback_state = PlaybackState.PLAYING
+        self._last_update_time = time.perf_counter()
+        self._dt_remainder = 0.0
+        self._view_offset = 0
+
+    def _pause(self):
+        self.playback_state = PlaybackState.PAUSED
+
+    def _stop(self):
+        self.playback_state = PlaybackState.STOPPED
+        self._dt_remainder = 0.0
+
+    def _set_speed(self, speed):
+        self.playback_speed = speed
+
+    def _scrub(self, offset):
+        """Set view offset into the ring buffer. Auto-pauses playback."""
+        if self.sim is None:
+            return
+        if self.playback_state == PlaybackState.PLAYING:
+            self.playback_state = PlaybackState.PAUSED
+        task = self.task
+        max_back = -min(task.iteration, task.buffer_size)
+        self._view_offset = max(max_back, min(0, int(offset)))
+
+    def _step(self, n):
+        """Step the simulation by n iterations. Positive = forward, negative = rewind view."""
+        if self.sim is None:
+            return
+
+        # Pause on manual step
+        if self.playback_state == PlaybackState.PLAYING:
+            self.playback_state = PlaybackState.PAUSED
+
+        task = self.task
+        if n > 0:
+            for _ in range(n):
+                if task.iteration >= task.n_iterations:
+                    task.iteration = 0
+                    task.sim_iteration = 0
+                    self.sim._env._step_count = 0
+                    self.sim._env._reset_next_step = False
+                self.sim.update_step_options()
+                for _ in range(task.cb_sub_steps):
+                    if self._mujoco_win._initialized:
+                        self._mujoco_win.apply_perturbation()
+                    self.sim._env.step(action=None)
+        else:
+            # Rewind view index (no physics rewind)
+            new_iter = max(0, task.iteration + n)
+            task.iteration = new_iter
+
+    # ── Menu ──────────────────────────────────────────────────────────
+
+    def menu(self):
+        if imgui.begin_menu("FARMSIM"):
+            if imgui.menu_item_simple("Open"):
+                self.load_experiment()
+            if imgui.menu_item_simple("Reload", enabled=self.sim is not None):
+                self._reload_experiment()
+            if imgui.menu_item_simple("Close", enabled=self.sim is not None):
+                self._teardown()
+            imgui.separator()
+            if imgui.menu_item_simple("New Plot Window", enabled=self.sim is not None):
+                self._add_plot_window()
+            imgui.separator()
+            if imgui.begin_menu("Windows"):
+                for window in self.windows.values():
+                    clicked, _ = imgui.menu_item(
+                        window.name, "", window.visible, True,
+                    )
+                    if clicked:
+                        window.toggle_visibility()
+                imgui.end_menu()
+            imgui.end_menu()
+
+    # ── Experiment loading ────────────────────────────────────────────
+
+    def load_experiment(self, path: str = None):
+        """Load an experiment config and set up the simulation."""
+        # if path is None:
+        #     result = pfd.open_file(
+        #         "Experiment options",
+        #         default_path="",
+        #         filters=["*.yaml"],
+        #     ).result()
+        #     path = result[0] if result else _DEV_EXPERIMENT
+        path = _DEV_EXPERIMENT
+
+        try:
+
+            self._teardown()
+
+            original_cwd = os.getcwd()
+            os.chdir(os.path.dirname(path))
+            exp = ExperimentOptions.load(path)
+            exp.animats[0].mujoco = {
+                "use_site": True,
+                "use_muscles": True,
+                "use_frc_trq_sensors": True,
+            }
+            exp.animats[0].name = "Arm"
+            os.chdir(original_cwd)
+
+            self.sim = simulation_setup(
+                experiment_options=exp,
+            )
+            self._experiment_path = path
+            self._config_win.load_file(path)
+            self.registry = build_registry(self.sim)
+            pylog.info(f"Loaded experiment: {path}")
+
+            # Restore saved plot windows, or create defaults
+            if not self._restore_plot_windows():
+                self._create_default_plot_windows()
+            self.init_windows()
+
+        except Exception as e:
+            pylog.error(f"Failed to load experiment: {e}")
+            console.print_exception(show_locals=True)
+            self.sim = None
+
+    def _reload_experiment(self):
+        """Reload the current experiment from disk."""
+        if hasattr(self, '_experiment_path'):
+            self.load_experiment(self._experiment_path)
+
+    _plot_window_counter = 0
+
+    def _add_plot_window(self):
+        """Create a new empty plot window the user can configure."""
+        FARMSIMExtension._plot_window_counter += 1
+        n = FARMSIMExtension._plot_window_counter
+        win = PlotWindow(self, PlotWindowConfig(name=f"Plot {n}"))
+        self.register_window(win)
+        win.initialize()
+        win._show_config = True
+
+    def _create_default_plot_windows(self):
+        """Create preset plot windows based on what's available in the registry."""
+        # Dynamics: one subplot per joint, showing position
+        joint_sources = self.registry.group("joints")
+        if joint_sources:
+            joint_names = sorted(set(
+                s.name.split("/")[1] for s in joint_sources
+            ))
+            dynamics_plots = []
+            for jname in joint_names:
+                dynamics_plots.append(PlotConfig(
+                    x_source="time",
+                    y_sources=[
+                        f"joints/{jname}/position",
+                        f"joints/{jname}/velocity",
+                    ],
+                    title=jname,
+                    y_label="rad | rad/s",
+                ))
+            win = PlotWindow(self, PlotWindowConfig(
+                name="Dynamics",
+                layout="subplots_vertical",
+                plots=dynamics_plots,
+            ))
+            self.register_window(win)
+
+        # Network outputs: group by prefix (RG, motor, In, BS, etc.)
+        network_sources = self.registry.group("network")
+        if network_sources:
+            groups = {}
+            for source in network_sources:
+                node_name = source.name.split("/")[-1]
+                # Group by first part before underscore
+                parts = node_name.split("_")
+                prefix = parts[0] if parts else node_name
+                if prefix not in groups:
+                    groups[prefix] = []
+                groups[prefix].append(source.name)
+            groups.pop('BS')
+            groups.pop('motor')
+            net_plots = []
+            for prefix, sources in groups.items():
+                net_plots.append(PlotConfig(
+                    x_source="time",
+                    y_sources=[
+                        "network/outputs/RG_F",
+                        "network/outputs/RG_E",
+                        "network/outputs/motor_flexor_Ia",
+                        "network/outputs/motor_flexor_II",
+                        "network/outputs/motor_flexor_Ib",
+                        "network/outputs/motor_extensor_Ia",
+                        "network/outputs/motor_extensor_II",
+                        "network/outputs/motor_extensor_Ib",
+                    ],
+                    title=prefix,
+                    y_label="",
+                ))
+            win = PlotWindow(self, PlotWindowConfig(
+                name="Networks",
+                layout="subplots_vertical",
+                plots=net_plots,
+            ))
+            self.register_window(win)
+
+        # Muscles: one subplot per muscle showing activation + fiber length
+        muscle_sources = self.registry.group("muscles")
+        if muscle_sources:
+            muscle_names = sorted(set(
+                s.name.split("/")[1] for s in muscle_sources
+            ))
+            muscle_plots = []
+            for mname in muscle_names:
+                muscle_plots.append(PlotConfig(
+                    x_source="time",
+                    y_sources=[
+                        f"muscles/{mname}/activation",
+                        # f"muscles/{mname}/fiber_length",
+                    ],
+                    title=mname,
+                    y_label="",
+                ))
+            win = PlotWindow(self, PlotWindowConfig(
+                name="Muscles",
+                layout="subplots_vertical",
+                plots=muscle_plots,
+            ))
+            self.register_window(win)
+
+    # ── Simulation stepping ───────────────────────────────────────────
+
+    def on_update(self, dt):
+        if self.sim is None or self.playback_state != PlaybackState.PLAYING:
+            return
+
+        now = time.perf_counter()
+        wall_elapsed = now - self._last_update_time
+        self._last_update_time = now
+
+        sim_budget = min(
+            (wall_elapsed + self._dt_remainder) * self.playback_speed, 0.1,
+        )
+        n_steps, self._dt_remainder = divmod(sim_budget, self.sim.task.timestep)
+        n_steps = int(n_steps)
+
+        task = self.task
+        for _ in range(n_steps):
+            if task.iteration >= task.n_iterations:
+                task.iteration = 0
+                task.sim_iteration = 0
+                self.sim._env._step_count = 0
+                self.sim._env._reset_next_step = False
+            self.sim.update_step_options()
+            for _ in range(task.cb_sub_steps):
+                if self._mujoco_win._initialized:
+                    self._mujoco_win.apply_perturbation()
+                self.sim._env.step(action=None)
+
+    # ── Input & lifecycle ─────────────────────────────────────────────
+
+    def on_event(self):
+        if self._mujoco_win._initialized:
+            self._mujoco_win.handle_input()
+
+    def _teardown(self):
+        """Clean up the current simulation if one exists."""
+        # Save plot configs before removing windows
+        if self.sim is not None:
+            self._last_saved_state = self.on_save_state()
+            pylog.info("Tearing down current simulation")
+            self.sim = None
+        # Remove dynamic windows (keep persistent windows like the viewport)
+        to_remove = [
+            name for name, w in self.windows.items()
+            if isinstance(w, PlotWindow)
+        ]
+        for name in to_remove:
+            self.unregister_window(self.windows[name])
+        self.registry = DataRegistry()
+        self.playback_state = PlaybackState.STOPPED
+        self._dt_remainder = 0.0
+        self._view_offset = 0
+
+    # ── State persistence ────────────────────────────────────────────
+
+    def on_save_state(self) -> dict:
+        """Save plot window configs so they persist across runs."""
+        # If sim is torn down, windows are gone — return cached state
+        plot_windows = [w for w in self.windows.values() if isinstance(w, PlotWindow)]
+        if not plot_windows:
+            return getattr(self, '_last_saved_state', {})
+
+        plot_configs = []
+        for window in plot_windows:
+            cfg = window.config
+            plot_configs.append({
+                "name": cfg.name,
+                "layout": cfg.layout,
+                "plots": [
+                    {
+                        "x_source": p.x_source,
+                        "y_sources": list(p.y_sources),
+                        "title": p.title,
+                        "y_label": p.y_label,
+                    }
+                    for p in cfg.plots
+                ],
+            })
+        return {
+            "plot_windows": plot_configs,
+            "experiment_path": getattr(self, '_experiment_path', None),
+        }
+
+    def on_restore_state(self, state: dict):
+        """Restore plot windows from saved state."""
+        self._saved_state = state
+
+    def _restore_plot_windows(self):
+        """Recreate plot windows from saved state. Called after experiment load."""
+        state = getattr(self, '_saved_state', None)
+        if state is None:
+            return False
+
+        # Only restore if same experiment
+        saved_path = state.get("experiment_path")
+        current_path = getattr(self, '_experiment_path', None)
+        if saved_path != current_path:
+            return False
+
+        plot_configs = state.get("plot_windows", [])
+        if not plot_configs:
+            return False
+
+        for cfg_dict in plot_configs:
+            plots = [
+                PlotConfig(
+                    x_source=p.get("x_source", "time"),
+                    y_sources=p.get("y_sources", []),
+                    title=p.get("title", ""),
+                    y_label=p.get("y_label", ""),
+                )
+                for p in cfg_dict.get("plots", [])
+            ]
+            config = PlotWindowConfig(
+                name=cfg_dict.get("name", "Plot"),
+                layout=cfg_dict.get("layout", "subplots_vertical"),
+                plots=plots,
+            )
+            win = PlotWindow(self, config)
+            self.register_window(win)
+
+        return True
+
+    def cleanup(self):
+        self._teardown()
