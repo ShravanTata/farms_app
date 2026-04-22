@@ -28,6 +28,7 @@ class ExtensionManager:
         super().__init__()
         self.fail_on_load = fail_on_load
         self._enabled_exts: dict[str, EnabledExtension] = {}
+        self.frame_timer = None  # set by FARMSApplication
 
         self._mgr = EnabledExtensionManager(
             namespace=EXTENSION_NAMESPACE,
@@ -110,11 +111,24 @@ class ExtensionManager:
 
     def tick(self, dt: float):
         """Per-frame dispatch: update -> event -> render for all enabled extensions."""
+        ft = self.frame_timer
         for name, enabled_ext in list(self._enabled_exts.items()):
             try:
+                if ft:
+                    ft.begin_scope(name)
+                    ft.begin_phase("update")
                 enabled_ext.obj.on_update(dt)
+                if ft:
+                    ft.end_phase("update")
+                    ft.begin_phase("event")
                 enabled_ext.obj.on_event()
-                enabled_ext.obj.render()
+                if ft:
+                    ft.end_phase("event")
+                    ft.begin_phase("render")
+                enabled_ext.obj.render(ft)
+                if ft:
+                    ft.end_phase("render")
+                    ft.end_scope()
             except Exception as e:
                 pylog.error(f"Error in extension {name}: {e}")
 
@@ -246,7 +260,7 @@ class Extension:
     def on_render(self):
         """Called during every render cycle for extension-level rendering."""
 
-    def render(self):
+    def render(self, frame_timer=None):
         """Render this extension and its windows.
         Override only if you need custom control over window iteration.
         """
@@ -257,7 +271,11 @@ class Extension:
 
         for window in self.windows.values():
             if window._initialized:
+                if frame_timer:
+                    frame_timer.begin_window(window.name)
                 window._render()
+                if frame_timer:
+                    frame_timer.end_window(window.name)
 
     def cleanup(self):
         """Clean up resources before shutdown."""
@@ -304,7 +322,7 @@ class UIExtension(Extension):
 
     category = "ui"
 
-    def render(self):
+    def render(self, frame_timer=None):
         """UI extensions render directly — no window iteration."""
         if self.hide:
             return

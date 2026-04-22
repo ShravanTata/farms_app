@@ -9,6 +9,7 @@ from farms_app.backends.manager import BackendManager
 from farms_app.backends.base import BaseBackend
 from farms_app.console import console
 from farms_app.core.extension import ExtensionManager
+from farms_app.core.profiler import FrameTimer
 from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui, implot
@@ -47,6 +48,10 @@ class FARMSApplication:
 
         # Setup extensions
         self.extension_manager = ExtensionManager()
+
+        # Frame timer
+        self.frame_timer = FrameTimer()
+        self.extension_manager.frame_timer = self.frame_timer
 
     def _setup_backend(self, options: ApplicationOptions):
         """ Setup backend """
@@ -107,6 +112,9 @@ class FARMSApplication:
             clicked, new_state = imgui.menu_item("Show Metrics", shortcut="", p_selected=self.show_metrics_window)
             if clicked:
                 self.show_metrics_window = new_state
+            clicked, new_state = imgui.menu_item("Frame Timer", shortcut="", p_selected=self.frame_timer.enabled)
+            if clicked:
+                self.frame_timer.enabled = new_state
             if imgui.begin_menu("Level"):
                 if imgui.menu_item("debug", shortcut="", p_selected=(pylog.get_level()=="debug"))[0]:
                     pylog.set_level("debug")
@@ -135,35 +143,39 @@ class FARMSApplication:
         _first = True
         _last_time = time.perf_counter()
 
-        while not self.backend.should_close():
+        try:
+            while not self.backend.should_close():
 
-            # Frame timing
-            now = time.perf_counter()
-            dt = now - _last_time
-            _last_time = now
+                # Frame timing
+                now = time.perf_counter()
+                dt = now - _last_time
+                _last_time = now
 
-            # Idling
-            self.fps_idling()
+                # Idling
+                self.fps_idling()
 
-            # Poll events
-            self.backend.poll_events()
+                # Poll events
+                self.backend.poll_events()
 
-            # Start the Dear ImGui frame
-            self.backend.begin_frame()
+                # Start the Dear ImGui frame
+                self.backend.begin_frame()
 
-            # Render main menu
-            self.render_menu()
+                # Render main menu
+                self.render_menu()
 
-            if _first:
-                for ext_name in self._options.auto_enable:
-                    self.extension_manager.enable(ext_name)
-                _first = False
+                if _first:
+                    for ext_name in self._options.auto_enable:
+                        self.extension_manager.enable(ext_name)
+                    self.extension_manager.load_state(self._options.extension.state)
+                    _first = False
 
-            # Tick all extensions: update(dt) -> event() -> render()
-            self.extension_manager.tick(dt)
+                # Tick all extensions: update(dt) -> event() -> render()
+                self.frame_timer.begin_frame()
+                self.extension_manager.tick(dt)
+                self.frame_timer.end_frame()
+                self.frame_timer.render_overlay()
 
-            # End the Dear ImGui frame
-            self.backend.end_frame()
-
-        # Cleanup
-        self.backend.cleanup()
+                # End the Dear ImGui frame
+                self.backend.end_frame()
+            self.extension_manager.shutdown()
+            self.backend.cleanup()
