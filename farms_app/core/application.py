@@ -190,5 +190,15 @@ class FARMSApplication:
 
                 # End the Dear ImGui frame
                 self.backend.end_frame()
+        except KeyboardInterrupt:
+            pylog.info("Interrupted — saving state")
+        finally:
+            # Save extension state into options and write to disk
+            self._options.extension.state = self.extension_manager.save_state()
+            try:
+                self._options.save(self._options_path)
+                pylog.info(f"Saved options to {self._options_path}")
+            except Exception as e:
+                pylog.error(f"Error saving options: {e}")
             self.extension_manager.shutdown()
             self.backend.cleanup()
