@@ -118,6 +118,35 @@ class ExtensionManager:
             except Exception as e:
                 pylog.error(f"Error in extension {name}: {e}")
 
+    def save_state(self) -> dict:
+        """Collect state from all enabled extensions. Returns a dict."""
+        state = {}
+        for name, ee in self._enabled_exts.items():
+            try:
+                ext_state = ee.obj.on_save_state()
+                if ext_state:
+                    state[name] = ext_state
+            except Exception as e:
+                pylog.error(f"Error saving state for {name}: {e}")
+        return state
+
+    def load_state(self, state: dict):
+        """Restore extension state from a dict."""
+        if not state:
+            return
+        for name, ext_state in state.items():
+            if name in self._enabled_exts:
+                try:
+                    self._enabled_exts[name].obj.on_restore_state(ext_state)
+                    pylog.info(f"Restored state for {name}")
+                except Exception as e:
+                    pylog.error(f"Error restoring state for {name}: {e}")
+
+    def shutdown(self):
+        """Disable and cleanup all enabled extensions. Called on app exit."""
+        for name in list(self._enabled_exts):
+            self.disable(name)
+
     def unload(self, name: str) -> bool:
         """Unload an extension completely (disable + remove from cache)."""
         if name not in self._mgr:
@@ -232,6 +261,13 @@ class Extension:
 
     def cleanup(self):
         """Clean up resources before shutdown."""
+
+    def on_save_state(self) -> dict:
+        """Return serializable state to persist across runs. Override to save custom state."""
+        return {}
+
+    def on_restore_state(self, state: dict):
+        """Restore state from a previous run. Override to load custom state."""
 
     def dependencies(self):
         """Return list of extension names this depends on."""
