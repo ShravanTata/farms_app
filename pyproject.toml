@@ -12,6 +12,8 @@ license-files = ["LICENSE"]
 requires-python = ">= 3.11"
 dependencies = [
     "imgui_bundle",
+    "pyopengl",
+    "glfw",
     "numpy",
     "tqdm",
     "pyyaml",
