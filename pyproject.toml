@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "farms_app"
-version = "0.1.1"
+version = "0.1.2"
 description = "GUI Application for neuromechanical simulations using FARMS"
 readme = "README.md"
 license = "Apache-2.0"
@@ -20,7 +20,6 @@ dependencies = [
     "rich",
     "h5py",
     "stevedore",
-    "farms_core",
 ]
 
 classifiers = [
@@ -40,6 +39,15 @@ Documentation = "https://farmsim.dev"
 Repository = "https://github.com/farmsim/farms_app.git"
 Issues = "https://github.com/farmsim/farms_app/issues"
 Changelog = "https://github.com/farmsim/farms_app/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+farms = [
+    "farms_core",
+    "farms_sim",
+    "farms_mujoco",
+    "farms_network",
+    "farms_muscle",
+]
 
 [project.scripts]
 farms-app = "farms_app.cli:main"
