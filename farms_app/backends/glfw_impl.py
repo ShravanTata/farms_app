@@ -232,6 +232,11 @@ class GLFWBackend(BaseBackend):
         """Check if window should close"""
         return glfw.window_should_close(self.window) if self.window else True
 
+    def request_close(self):
+        """Request the window to close"""
+        if self.window:
+            glfw.set_window_should_close(self.window, True)
+
     def poll_events(self):
         """ Poll GLFW events """
         glfw.poll_events()
