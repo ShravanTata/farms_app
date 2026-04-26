@@ -1,18 +1,21 @@
 """ Main FARMSIM extension """
-from farms_app.console import console
 
 import os
 import time
 
+from farms_app.console import console
+from farms_app.core.config_editor import ConfigEditorWindow
 from farms_app.core.extension import Extension
 from farms_app.core.widget import PlaybackState, SimulationToolbar
-from farms_app.plots.data_registry import DataRegistry
-from farms_app.plots.plot_window import PlotWindow, PlotConfig, PlotWindowConfig
 from farms_app.extensions.farmsim.data_registry import build_registry
-from farms_app.core.config_editor import ConfigEditorWindow
-from farms_app.extensions.farmsim.windows.mujoco_viewport import MuJoCoViewportWindow
-from farms_app.extensions.farmsim.windows.network_visualizer import NetworkVisualizerWindow
+from farms_app.extensions.farmsim.windows.mujoco_viewport import \
+    MuJoCoViewportWindow
+from farms_app.extensions.farmsim.windows.network_visualizer import \
+    NetworkVisualizerWindow
 from farms_app.extensions.farmsim.windows.properties import PropertiesWindow
+from farms_app.plots.data_registry import DataRegistry
+from farms_app.plots.plot_window import (PlotConfig, PlotWindow,
+                                         PlotWindowConfig)
 from farms_core import pylog
 from farms_core.experiment.options import ExperimentOptions
 from farms_core.simulation.options import Simulator
@@ -59,8 +62,7 @@ class FARMSIMExtension(Extension):
         self._network_vis_win = NetworkVisualizerWindow(self)
         self.register_window(self._network_vis_win)
 
-    # ── Data accessors ────────────────────────────────────────────────
-
+    # Data accessors
     @property
     def task(self):
         """The simulation task, or None if no sim is loaded."""
@@ -92,8 +94,7 @@ class FARMSIMExtension(Extension):
         except (IndexError, AttributeError):
             return None
 
-    # ── Playback controls ─────────────────────────────────────────────
-
+    # Playback controls
     def _play(self):
         if self.sim is None:
             return
@@ -149,8 +150,7 @@ class FARMSIMExtension(Extension):
             new_iter = max(0, task.iteration + n)
             task.iteration = new_iter
 
-    # ── Menu ──────────────────────────────────────────────────────────
-
+    # Menu
     def menu(self):
         if imgui.begin_menu("FARMSIM"):
             if imgui.menu_item_simple("Open"):
@@ -173,8 +173,7 @@ class FARMSIMExtension(Extension):
                 imgui.end_menu()
             imgui.end_menu()
 
-    # ── Experiment loading ────────────────────────────────────────────
-
+    # Experiment loading
     def load_experiment(self, path: str = None):
         """Load an experiment config and set up the simulation."""
         if path is None:
@@ -258,8 +257,7 @@ class FARMSIMExtension(Extension):
                     self._mujoco_win.apply_perturbation()
                 self.sim._env.step(action=None)
 
-    # ── Input & lifecycle ─────────────────────────────────────────────
-
+    # Input & lifecycle
     def on_event(self):
         if self._mujoco_win._initialized:
             self._mujoco_win.handle_input()
@@ -283,8 +281,7 @@ class FARMSIMExtension(Extension):
         self._dt_remainder = 0.0
         self._view_offset = 0
 
-    # ── State persistence ────────────────────────────────────────────
-
+    # State persistence
     def on_save_state(self) -> dict:
         """Save plot window configs so they persist across runs."""
         # If sim is torn down, windows are gone — return cached state
