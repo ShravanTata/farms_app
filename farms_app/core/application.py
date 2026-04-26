@@ -15,6 +15,7 @@ from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui, implot
 
+from .menus import render_main_menu
 from .options import ApplicationOptions
 
 _DEFAULT_OPTIONS_FILE = "options.yaml"
@@ -100,55 +101,7 @@ class FARMSApplication:
 
     def render_menu(self):
         """ Render menu """
-        imgui.begin_main_menu_bar()
-
-        if imgui.begin_menu("View"):
-            if imgui.begin_menu("Theme"):
-                imgui.show_style_selector("Styles")
-                imgui.show_style_editor()
-                imgui.end_menu()
-            imgui.separator()
-            for name, extension in self.extension_manager._enabled_exts.items():
-                clicked, new_state = imgui.menu_item(
-                    name, shortcut="", p_selected=not extension.obj.hide
-                )
-                if clicked:
-                    extension.obj.hide = not new_state
-            imgui.end_menu()
-
-        if imgui.begin_menu("Debug"):
-            clicked, new_state = imgui.menu_item("Show Metrics", shortcut="", p_selected=self.show_metrics_window)
-            if clicked:
-                self.show_metrics_window = new_state
-            clicked, new_state = imgui.menu_item("Frame Timer", shortcut="", p_selected=self.frame_timer.enabled)
-            if clicked:
-                self.frame_timer.enabled = new_state
-            if imgui.begin_menu("Level"):
-                if imgui.menu_item("debug", shortcut="", p_selected=(pylog.get_level()=="debug"))[0]:
-                    pylog.set_level("debug")
-                if imgui.menu_item("info", shortcut="", p_selected=(pylog.get_level()=="info"))[0]:
-                    pylog.set_level("info")
-                if imgui.menu_item("warning", shortcut="", p_selected=(pylog.get_level()=="warning"))[0]:
-                    pylog.set_level("warning")
-                imgui.end_menu()
-            imgui.end_menu()
-
-        if imgui.begin_menu("Extensions"):
-            for name in self.extension_manager.names:
-                clicked, new_state = imgui.menu_item(
-                    name, shortcut="", p_selected=True if name in self.extension_manager._enabled_exts else False
-                )
-                if clicked and new_state:
-                    self.extension_manager.enable(name)
-                elif clicked and not new_state:
-                    self.extension_manager.disable(name)
-            imgui.end_menu()
-
-        # Extension menus (namespaced top-level menus)
-        for name, extension in self.extension_manager._enabled_exts.items():
-            extension.obj.menu()
-
-        imgui.end_main_menu_bar()
+        render_main_menu(self)
 
     def run(self):
         """main run method"""
