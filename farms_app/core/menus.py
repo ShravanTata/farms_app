@@ -1,7 +1,19 @@
 """ Main application level menus """
 
+import sys
+from importlib.metadata import version
+
+import farms_app
 from farms_core import pylog
 from imgui_bundle import imgui
+
+
+_ABOUT_ROWS = (
+    ("VERSION", farms_app.__version__),
+    ("PYTHON", sys.version.split()[0]),
+    ("IMGUI_BUNDLE", version("imgui-bundle")),
+    ("LICENSE", "Apache-2.0"),
+)
 
 
 def render_main_menu(app):
@@ -72,7 +84,15 @@ def render_main_menu(app):
 
     # Help
     if imgui.begin_menu("Help"):
-        imgui.menu_item_simple("About FARMS App")
+        imgui.separator()
+        if imgui.begin_table("##about", 2, imgui.TableFlags_.borders_inner_v.value):
+            for label, value in _ABOUT_ROWS:
+                imgui.table_next_row()
+                imgui.table_next_column()
+                imgui.text(label)
+                imgui.table_next_column()
+                imgui.text(value)
+            imgui.end_table()
         imgui.end_menu()
 
     # Extension-contributed top-level menus
