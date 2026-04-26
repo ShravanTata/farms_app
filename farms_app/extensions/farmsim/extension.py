@@ -23,6 +23,8 @@ from imgui_bundle import portable_file_dialogs as pfd
 
 class FARMSIMExtension(Extension):
 
+    _PLOT_WINDOW_COUNTER = 0
+
     def __init__(self):
         super().__init__(name="FARMSIM")
         self.sim = None
@@ -206,7 +208,7 @@ class FARMSIMExtension(Extension):
 
             # Restore saved plot windows, or create defaults
             if not self._restore_plot_windows():
-                self._create_default_plot_windows()
+                self._add_plot_window()
             self.init_windows()
 
         except Exception as e:
@@ -219,107 +221,16 @@ class FARMSIMExtension(Extension):
         if hasattr(self, '_experiment_path'):
             self.load_experiment(self._experiment_path)
 
-    _plot_window_counter = 0
-
     def _add_plot_window(self):
         """Create a new empty plot window the user can configure."""
-        FARMSIMExtension._plot_window_counter += 1
-        n = FARMSIMExtension._plot_window_counter
+        FARMSIMExtension._PLOT_WINDOW_COUNTER += 1
+        n = FARMSIMExtension._PLOT_WINDOW_COUNTER
         win = PlotWindow(self, PlotWindowConfig(name=f"Plot {n}"))
         self.register_window(win)
         win.initialize()
         win._show_config = True
 
-    def _create_default_plot_windows(self):
-        """Create preset plot windows based on what's available in the registry."""
-        # Dynamics: one subplot per joint, showing position
-        joint_sources = self.registry.group("joints")
-        if joint_sources:
-            joint_names = sorted(set(
-                s.name.split("/")[1] for s in joint_sources
-            ))
-            dynamics_plots = []
-            for jname in joint_names:
-                dynamics_plots.append(PlotConfig(
-                    x_source="time",
-                    y_sources=[
-                        f"joints/{jname}/position",
-                        f"joints/{jname}/velocity",
-                    ],
-                    title=jname,
-                    y_label="rad | rad/s",
-                ))
-            win = PlotWindow(self, PlotWindowConfig(
-                name="Dynamics",
-                layout="subplots_vertical",
-                plots=dynamics_plots,
-            ))
-            self.register_window(win)
-
-        # Network outputs: group by prefix (RG, motor, In, BS, etc.)
-        network_sources = self.registry.group("network")
-        if network_sources:
-            groups = {}
-            for source in network_sources:
-                node_name = source.name.split("/")[-1]
-                # Group by first part before underscore
-                parts = node_name.split("_")
-                prefix = parts[0] if parts else node_name
-                if prefix not in groups:
-                    groups[prefix] = []
-                groups[prefix].append(source.name)
-            groups.pop('BS')
-            groups.pop('motor')
-            net_plots = []
-            for prefix, sources in groups.items():
-                net_plots.append(PlotConfig(
-                    x_source="time",
-                    y_sources=[
-                        "network/outputs/RG_F",
-                        "network/outputs/RG_E",
-                        "network/outputs/motor_flexor_Ia",
-                        "network/outputs/motor_flexor_II",
-                        "network/outputs/motor_flexor_Ib",
-                        "network/outputs/motor_extensor_Ia",
-                        "network/outputs/motor_extensor_II",
-                        "network/outputs/motor_extensor_Ib",
-                    ],
-                    title=prefix,
-                    y_label="",
-                ))
-            win = PlotWindow(self, PlotWindowConfig(
-                name="Networks",
-                layout="subplots_vertical",
-                plots=net_plots,
-            ))
-            self.register_window(win)
-
-        # Muscles: one subplot per muscle showing activation + fiber length
-        muscle_sources = self.registry.group("muscles")
-        if muscle_sources:
-            muscle_names = sorted(set(
-                s.name.split("/")[1] for s in muscle_sources
-            ))
-            muscle_plots = []
-            for mname in muscle_names:
-                muscle_plots.append(PlotConfig(
-                    x_source="time",
-                    y_sources=[
-                        f"muscles/{mname}/activation",
-                        # f"muscles/{mname}/fiber_length",
-                    ],
-                    title=mname,
-                    y_label="",
-                ))
-            win = PlotWindow(self, PlotWindowConfig(
-                name="Muscles",
-                layout="subplots_vertical",
-                plots=muscle_plots,
-            ))
-            self.register_window(win)
-
-    # ── Simulation stepping ───────────────────────────────────────────
-
+    # Simulation stepping
     def on_update(self, dt):
         if self.sim is None or self.playback_state != PlaybackState.PLAYING:
             return
