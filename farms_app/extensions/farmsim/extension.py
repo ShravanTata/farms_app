@@ -21,13 +21,6 @@ from imgui_bundle import imgui
 from imgui_bundle import portable_file_dialogs as pfd
 
 
-# Default experiment path for development
-_DEV_EXPERIMENT = (
-    "/Users/tatarama/projects/work/research/neuromechanics"
-    "/misc/pendulum-fb/config/experiment.yaml"
-)
-
-
 class FARMSIMExtension(Extension):
 
     def __init__(self):
@@ -182,14 +175,13 @@ class FARMSIMExtension(Extension):
 
     def load_experiment(self, path: str = None):
         """Load an experiment config and set up the simulation."""
-        # if path is None:
-        #     result = pfd.open_file(
-        #         "Experiment options",
-        #         default_path="",
-        #         filters=["*.yaml"],
-        #     ).result()
-        #     path = result[0] if result else _DEV_EXPERIMENT
-        path = _DEV_EXPERIMENT
+        if path is None:
+            result = pfd.open_file(
+                "Experiment options",
+                default_path="",
+                filters=["*.yaml"],
+            ).result()
+            path = result[0]
 
         try:
 
@@ -206,9 +198,7 @@ class FARMSIMExtension(Extension):
             exp.animats[0].name = "Arm"
             os.chdir(original_cwd)
 
-            self.sim = simulation_setup(
-                experiment_options=exp,
-            )
+            self.sim = simulation_setup(experiment_options=exp,)
             self._experiment_path = path
             self._config_win.load_file(path)
             self.registry = build_registry(self.sim)
