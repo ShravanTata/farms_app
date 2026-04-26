@@ -14,6 +14,9 @@ class BackendError(Exception):
 class BaseBackend(ABC):
     """Abstract base class for all backends"""
 
+    platform_name: str = "Unknown"
+    renderer_name: str = "Unknown"
+
     @abstractmethod
     def initialize(self, name: str, width: int, height: int, **kwargs) -> Any:
         """Initialize the backend and return window handle"""

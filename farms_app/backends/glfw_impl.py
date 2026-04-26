@@ -37,6 +37,9 @@ class OpenGLVersion(Enum):
 class GLFWBackend(BaseBackend):
     """GLFW + OpenGL backend with version selection"""
 
+    platform_name = "GLFW"
+    renderer_name = "OpenGL"
+
     def __init__(self, gl_version: OpenGLVersion = OpenGLVersion.AUTO):
         self.gl_version = gl_version
         self.window = None
