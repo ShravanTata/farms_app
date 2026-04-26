@@ -18,6 +18,7 @@ from imgui_bundle import imgui, implot
 from .menus import render_main_menu
 from .options import ApplicationOptions
 
+
 _DEFAULT_OPTIONS_FILE = "options.yaml"
 
 
@@ -35,7 +36,7 @@ class FARMSApplication:
         self.backend: BaseBackend = None
         self._io = None
         self._setup_backend(self._options)
-        self.show_metrics_window = True
+        self.show_metrics_window = False
 
         self.fps_idle = options.fps_idle
         self.enable_idling = options.enable_idling
@@ -125,6 +126,10 @@ class FARMSApplication:
 
                 # Start the Dear ImGui frame
                 self.backend.begin_frame()
+
+                # Debug
+                if self.show_metrics_window:
+                    self.show_metrics_window = imgui.show_metrics_window(self.show_metrics_window)
 
                 # Render main menu
                 self.render_menu()
