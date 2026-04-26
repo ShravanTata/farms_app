@@ -16,6 +16,22 @@ _ABOUT_ROWS = (
 )
 
 
+_COL0_WIDTH = 200.0
+
+def _info_table(table_id, rows):
+    """Render a two-column label/value table."""
+    if imgui.begin_table(table_id, 2, imgui.TableFlags_.borders_inner_v.value):
+        imgui.table_setup_column("##label", imgui.TableColumnFlags_.width_fixed.value, _COL0_WIDTH)
+        imgui.table_setup_column("##value")
+        for label, value in rows:
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(label)
+            imgui.table_next_column()
+            imgui.text(value)
+        imgui.end_table()
+
+
 def render_main_menu(app):
     """Render the main menu bar.
 
@@ -84,15 +100,13 @@ def render_main_menu(app):
 
     # Help
     if imgui.begin_menu("Help"):
+        imgui.separator_text("Graphics")
+        _info_table("##graphics", (
+            ("PLATFORM", app.backend.platform_name),
+            ("RENDERER", app.backend.renderer_name),
+        ))
         imgui.separator()
-        if imgui.begin_table("##about", 2, imgui.TableFlags_.borders_inner_v.value):
-            for label, value in _ABOUT_ROWS:
-                imgui.table_next_row()
-                imgui.table_next_column()
-                imgui.text(label)
-                imgui.table_next_column()
-                imgui.text(value)
-            imgui.end_table()
+        _info_table("##about", _ABOUT_ROWS)
         imgui.end_menu()
 
     # Extension-contributed top-level menus
