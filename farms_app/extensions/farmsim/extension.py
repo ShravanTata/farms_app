@@ -211,7 +211,7 @@ class FARMSIMExtension(Extension):
                 "use_muscles": True,
                 "use_frc_trq_sensors": True,
             }
-            exp.animats[0].name = "Arm"
+            exp.animats[0].name = "Model"
             os.chdir(original_cwd)
 
             self.sim = simulation_setup(experiment_options=exp,)
