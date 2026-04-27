@@ -4,15 +4,17 @@ Thin wrapper around imgui.internal.dock_builder_* to keep
 extension code clean and insulated from internal API details.
 """
 
+import os
+
 from imgui_bundle import imgui
 
 
-def is_first_use(dockspace_id: int) -> bool:
-    """True when the dockspace has no layout yet (no imgui.ini loaded)."""
-    node = imgui.internal.dock_builder_get_node(dockspace_id)
-    if node is None:
+def is_first_use() -> bool:
+    """True when no imgui.ini exists (first launch)."""
+    ini = imgui.get_io().get_ini_filename()
+    if not ini:
         return True
-    return node.is_leaf_node
+    return not os.path.exists(ini)
 
 
 def split(node_id: int, direction: imgui.Dir, ratio: float) -> tuple:

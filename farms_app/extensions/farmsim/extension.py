@@ -61,6 +61,19 @@ class FARMSIMExtension(Extension):
         self.register_window(self._config_win)
         self._network_vis_win = NetworkVisualizerWindow(self)
         self.register_window(self._network_vis_win)
+        self._bottom_dock_id = 0
+
+    def on_enable(self):
+        from farms_app.core import layout
+        if layout.is_first_use():
+            ds = self.dockspace_id
+            left, rest = layout.split(ds, imgui.Dir.left, 0.2)
+            self._bottom_dock_id, center = layout.split(rest, imgui.Dir.down, 0.25)
+            layout.dock_window(self._config_win.window_id, left)
+            layout.dock_window(self._properties_win.window_id, left)
+            layout.dock_window(self._mujoco_win.window_id, center)
+            layout.dock_window(self._network_vis_win.window_id, center)
+            layout.finish(ds)
 
     # Data accessors
     @property
@@ -230,6 +243,9 @@ class FARMSIMExtension(Extension):
         self.register_window(win)
         win.initialize()
         win._show_config = True
+        if self._bottom_dock_id:
+            from farms_app.core import layout
+            layout.dock_window(win.window_id, self._bottom_dock_id)
 
     # Simulation stepping
     def on_update(self, dt):

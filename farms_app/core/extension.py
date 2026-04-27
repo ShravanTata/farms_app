@@ -29,6 +29,7 @@ class ExtensionManager:
         self.fail_on_load = fail_on_load
         self._enabled_exts: dict[str, EnabledExtension] = {}
         self.frame_timer = None  # set by FARMSApplication
+        self.dockspace_id: int = 0  # set by FARMSApplication
 
         self._mgr = EnabledExtensionManager(
             namespace=EXTENSION_NAMESPACE,
@@ -79,6 +80,7 @@ class ExtensionManager:
         try:
             _ext = self._mgr[name]
             ext_obj = _ext.plugin()
+            ext_obj.dockspace_id = self.dockspace_id
             self._enabled_exts[name] = EnabledExtension(
                 entry_point=_ext.entry_point,
                 obj=ext_obj,
@@ -204,6 +206,7 @@ class Extension:
     def __init__(self, name: str):
         self.name = name
         self.hide: bool = False
+        self.dockspace_id: int = 0
         self.windows: dict[str, Window] = {}
 
     ###########

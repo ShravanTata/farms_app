@@ -141,6 +141,7 @@ class FARMSApplication:
                 self.render_menu()
 
                 if _first:
+                    self.extension_manager.dockspace_id = self.dockspace_id
                     for ext_name in self._options.auto_enable:
                         self.extension_manager.enable(ext_name)
                     self.extension_manager.load_state(self._options.extension.state)
