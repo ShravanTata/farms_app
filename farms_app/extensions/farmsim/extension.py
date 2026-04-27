@@ -67,7 +67,7 @@ class FARMSIMExtension(Extension):
 
     def on_enable(self):
         from farms_app.core import layout
-        if layout.is_first_use():
+        if self.dockspace_id and layout.is_first_use():
             ds = self.dockspace_id
             left, rest = layout.split(ds, imgui.Dir.left, 0.2)
             self._bottom_dock_id, center = layout.split(rest, imgui.Dir.down, 0.25)
