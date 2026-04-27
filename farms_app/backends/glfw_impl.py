@@ -200,7 +200,6 @@ class GLFWBackend(BaseBackend):
             imgui.backends.opengl2_new_frame()
         imgui.backends.glfw_new_frame()
         imgui.new_frame()
-        imgui.dock_space_over_viewport(viewport=imgui.get_main_viewport())
 
     def end_frame(self):
         """End frame rendering"""

@@ -52,6 +52,9 @@ class FARMSApplication:
         # Setup extensions
         self.extension_manager = ExtensionManager()
 
+        # Dockspace
+        self.dockspace_id: int = 0
+
         # Frame timer
         self.frame_timer = FrameTimer()
         self.extension_manager.frame_timer = self.frame_timer
@@ -126,6 +129,9 @@ class FARMSApplication:
 
                 # Start the Dear ImGui frame
                 self.backend.begin_frame()
+                self.dockspace_id = imgui.dock_space_over_viewport(
+                    viewport=imgui.get_main_viewport()
+                )
 
                 # Debug
                 if self.show_metrics_window:
