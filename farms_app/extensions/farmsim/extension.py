@@ -160,8 +160,10 @@ class FARMSIMExtension(Extension):
             if imgui.menu_item_simple("Close", enabled=self.sim is not None):
                 self._teardown()
             imgui.separator()
-            if imgui.menu_item_simple("New Plot Window", enabled=self.sim is not None):
-                self._add_plot_window()
+            if imgui.begin_menu("Add", enabled=self.sim is not None):
+                if imgui.menu_item_simple("Plot Window"):
+                    self._add_plot_window()
+                imgui.end_menu()
             imgui.separator()
             if imgui.begin_menu("Windows"):
                 for window in self.windows.values():
