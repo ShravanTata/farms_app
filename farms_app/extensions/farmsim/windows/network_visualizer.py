@@ -72,7 +72,6 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         super().__init__("Network Visualizer", extension)
         self._edges_p1p2 = []
         self._edge_weights = []
-        self._external_input_nodes = []
         self._network_ready = False
         self._needs_fit = False
 
@@ -93,11 +92,6 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
             p2 = tgt_node.visual['position'][:2]
             self._edges_p1p2.append((p1, p2))
             self._edge_weights.append(net.data.edges[i].weight)
-
-        self._external_input_nodes = []
-        for node_data in net.data.nodes:
-            if hasattr(node_data, 'external_input') and node_data.external_input is not None:
-                self._external_input_nodes.append(node_data.name)
 
         # Compute bounding box for initial fit
         positions = [n.visual['position'][:2] for n in net.options.nodes]
