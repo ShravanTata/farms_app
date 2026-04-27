@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 import numpy as np
 from farms_app.core.window import Window
 from imgui_bundle import imgui, implot
-from imgui_bundle.immapp import icons_fontawesome_6 as fa6
 
 
 LAYOUT_TYPES = ["subplots_vertical", "tabs"]
@@ -29,8 +28,7 @@ LAYOUT_TYPES = ["subplots_vertical", "tabs"]
 X_STATIC = ["time", "index"]
 
 
-# ── Configuration ────────────────────────────────────────────────────
-
+# Configuration
 @dataclass
 class ReferenceCurve:
     """A static reference curve drawn as a background line on a plot.
@@ -69,8 +67,7 @@ class PlotWindowConfig:
     plots: list[PlotConfig] = field(default_factory=list)
 
 
-# ── Window ───────────────────────────────────────────────────────────
-
+# Window
 class PlotWindow(Window):
     """A window that renders plots based on its configuration.
 
@@ -81,8 +78,9 @@ class PlotWindow(Window):
     def __init__(self, extension, config: PlotWindowConfig):
         super().__init__(config.name, extension)
         self.config = config
-        self._show_config = False
         self._plot_to_remove = None
+        self._rename_target = None  # PlotConfig being renamed
+        self._rename_buf = ""
 
     def on_render(self):
         if not hasattr(self._extension, 'registry') or not hasattr(self._extension, 'task'):
@@ -93,136 +91,112 @@ class PlotWindow(Window):
             imgui.text("No data loaded")
             return
 
-        # Config toggle button
-        label = (fa6.ICON_FA_XMARK + " Close") if self._show_config else (fa6.ICON_FA_GEAR + " Config")
-        if imgui.button(label):
-            self._show_config = not self._show_config
-
-        if self._show_config:
-            self._render_config_panel()
-            return
-
         # Plots
         if self.config.layout == "tabs":
             self._render_tabs(task)
         else:
             self._render_subplots(task)
 
-    # ── Configuration panel ──────────────────────────────────────────
+        # Rename popup (must be outside plot/menu scope)
+        self._render_rename_popup()
 
-    def _render_config_panel(self):
+        # Window-level context menu (right-click on empty area)
+        self._render_window_context_menu()
+
+    # Context menus
+    def _render_window_context_menu(self):
+        """Right-click on the window background for window-level actions."""
+        if imgui.begin_popup_context_window("##plot_window_ctx", imgui.PopupFlags_.mouse_button_right | imgui.PopupFlags_.no_open_over_items):
+            if imgui.menu_item_simple("Add Plot"):
+                self.config.plots.append(PlotConfig(title=f"Plot {len(self.config.plots) + 1}"))
+            if imgui.begin_menu("Layout"):
+                for lt in LAYOUT_TYPES:
+                    if imgui.menu_item(lt, "", self.config.layout == lt)[0]:
+                        self.config.layout = lt
+                imgui.end_menu()
+            imgui.end_popup()
+
+    def _render_rename_popup(self):
+        """Modal popup for renaming a plot."""
+        popup_id = "##rename_plot"
+        if self._rename_target is not None:
+            imgui.open_popup(popup_id)
+
+        if imgui.begin_popup(popup_id):
+            if self._rename_target is None:
+                imgui.close_current_popup()
+                imgui.end_popup()
+                return
+
+            imgui.set_keyboard_focus_here()
+            changed, self._rename_buf = imgui.input_text(
+                "##rename", self._rename_buf,
+                imgui.InputTextFlags_.enter_returns_true,
+            )
+            if changed:
+                self._rename_target.title = self._rename_buf
+                self._rename_target = None
+                imgui.close_current_popup()
+            if imgui.is_key_pressed(imgui.Key.escape):
+                self._rename_target = None
+                imgui.close_current_popup()
+            imgui.end_popup()
+
+    def _render_plot_context_menu(self, plot_cfg, plot_index):
+        """Right-click context menu for a specific plot."""
         registry = self._extension.registry
+        if not imgui.begin_popup_context_item(f"##plot_ctx_{plot_index}"):
+            return
 
-        # Layout selector
-        layout_idx = LAYOUT_TYPES.index(self.config.layout) if self.config.layout in LAYOUT_TYPES else 0
-        changed, layout_idx = imgui.combo("Layout", layout_idx, LAYOUT_TYPES)
-        if changed:
-            self.config.layout = LAYOUT_TYPES[layout_idx]
+        # Rename
+        if imgui.menu_item_simple("Rename"):
+            self._rename_target = plot_cfg
+            self._rename_buf = plot_cfg.title
 
         imgui.separator()
 
-        # Per-plot config
-        self._plot_to_remove = None
-        for i, plot_cfg in enumerate(self.config.plots):
-            imgui.push_id(i)
-            self._render_plot_config(i, plot_cfg, registry)
-            imgui.pop_id()
+        # X axis source
+        if imgui.begin_menu("X Axis"):
+            for name in X_STATIC:
+                if imgui.menu_item(name, "", plot_cfg.x_source == name)[0]:
+                    plot_cfg.x_source = name
             imgui.separator()
+            for group_name in registry.groups:
+                if imgui.begin_menu(group_name):
+                    for source in registry.group(group_name):
+                        channel = source.name.rsplit("/", 1)[-1]
+                        display = f"{channel} ({source.unit})" if source.unit else channel
+                        if imgui.menu_item(display, "", plot_cfg.x_source == source.name)[0]:
+                            plot_cfg.x_source = source.name
+                    imgui.end_menu()
+            imgui.end_menu()
 
-        # Remove deferred
-        if self._plot_to_remove is not None and self._plot_to_remove < len(self.config.plots):
-            self.config.plots.pop(self._plot_to_remove)
-
-        # Add plot button
-        if imgui.button("+ Add Plot"):
-            self.config.plots.append(PlotConfig(title=f"Plot {len(self.config.plots) + 1}"))
-
-    def _render_plot_config(self, index, plot_cfg, registry):
-        expanded = imgui.tree_node(f"{plot_cfg.title or f'Plot {index + 1}'}##plot_{index}")
-        if not expanded:
-            return
-
-        # Title
-        changed, new_title = imgui.input_text("Title", plot_cfg.title)
-        if changed:
-            plot_cfg.title = new_title
-
-        # X source selector
-        self._render_x_source_selector(plot_cfg, registry)
-
-        # Y sources
-        imgui.text("Y signals:")
-        sources_to_remove = []
-        for j, source_name in enumerate(plot_cfg.y_sources):
-            imgui.push_id(j)
-            imgui.bullet_text(source_name)
-            imgui.same_line()
-            if imgui.small_button("x"):
-                sources_to_remove.append(j)
-            imgui.pop_id()
-
-        for j in reversed(sources_to_remove):
-            plot_cfg.y_sources.pop(j)
-
-        # Add signal picker
-        self._render_add_signal(plot_cfg, registry)
-
-        # Remove plot
-        imgui.spacing()
-        if imgui.small_button("Remove Plot"):
-            self._plot_to_remove = index
-
-        imgui.tree_pop()
-
-    def _render_x_source_selector(self, plot_cfg, registry):
-        """X-axis source picker with Static and Data categories."""
-        current = plot_cfg.x_source or "time"
-        popup_id = f"##x_src_{id(plot_cfg)}"
-
-        imgui.text("X axis:")
-        imgui.same_line()
-        if imgui.button(f"{current}##x_btn"):
-            imgui.open_popup(popup_id)
-
-        if imgui.begin_popup(popup_id):
-            # Static options
-            if imgui.tree_node("Static"):
-                for name in X_STATIC:
-                    if imgui.menu_item_simple(name):
-                        plot_cfg.x_source = name
-                        imgui.close_current_popup()
-                imgui.tree_pop()
-
-            # Data sources from registry
-            if imgui.tree_node("Data"):
-                for group_name in registry.groups:
-                    if imgui.tree_node(group_name):
-                        for source in registry.group(group_name):
-                            channel = source.name.rsplit("/", 1)[-1]
-                            display = f"{channel} ({source.unit})" if source.unit else channel
-                            if imgui.menu_item_simple(display):
-                                plot_cfg.x_source = source.name
-                                imgui.close_current_popup()
-                        imgui.tree_pop()
-                imgui.tree_pop()
-
-            imgui.end_popup()
-
-    def _render_add_signal(self, plot_cfg, registry):
-        """Button + popup to add signals to y_sources."""
-        popup_id = f"##add_sig_{id(plot_cfg)}"
-
-        if imgui.button("+ Add Signal"):
-            imgui.open_popup(popup_id)
-
-        if imgui.begin_popup(popup_id):
+        # Add signals
+        if imgui.begin_menu("Add Signal"):
             self._render_source_tree(registry, plot_cfg)
-            imgui.end_popup()
+            imgui.end_menu()
+
+        # Remove signals
+        if plot_cfg.y_sources and imgui.begin_menu("Remove Signal"):
+            to_remove = None
+            for j, source_name in enumerate(plot_cfg.y_sources):
+                if imgui.menu_item_simple(source_name):
+                    to_remove = j
+            if to_remove is not None:
+                plot_cfg.y_sources.pop(to_remove)
+            imgui.end_menu()
+
+        imgui.separator()
+
+        if imgui.menu_item_simple("Remove Plot"):
+            self._plot_to_remove = plot_index
+
+        imgui.end_popup()
 
     def _render_source_tree(self, registry, plot_cfg):
         """Grouped tree of data sources for y-axis selection."""
         for group_name in registry.groups:
-            if imgui.tree_node(group_name):
+            if imgui.begin_menu(group_name):
                 items = {}
                 for source in registry.group(group_name):
                     parts = source.name.split("/")
@@ -232,7 +206,7 @@ class PlotWindow(Window):
                     items[item_name].append(source)
 
                 for item_name, sources in items.items():
-                    if imgui.tree_node(item_name):
+                    if imgui.begin_menu(item_name):
                         for source in sources:
                             channel = source.name.rsplit("/", 1)[-1]
                             display = f"{channel} ({source.unit})" if source.unit else channel
@@ -241,11 +215,10 @@ class PlotWindow(Window):
                                 imgui.text_disabled(display)
                             elif imgui.menu_item_simple(display):
                                 plot_cfg.y_sources.append(source.name)
-                        imgui.tree_pop()
-                imgui.tree_pop()
+                        imgui.end_menu()
+                imgui.end_menu()
 
-    # ── Plot rendering ───────────────────────────────────────────────
-
+    # Plot rendering
     _MIN_SUBPLOT_HEIGHT = 120
     _REF_ALPHA = 0.4
 
@@ -279,7 +252,7 @@ class PlotWindow(Window):
     def _render_subplots(self, task):
         plots = self.config.plots
         if not plots:
-            imgui.text("No plots configured — click Config to add plots")
+            imgui.text("No plots configured — right-click to add")
             return
 
         all_time = all(p.x_source in ("time", "") for p in plots)
@@ -297,6 +270,7 @@ class PlotWindow(Window):
                 imgui.ImVec2(-1, -1),
             )
 
+        self._plot_to_remove = None
         self._push_plot_style()
         try:
             if implot.begin_subplots(
@@ -305,27 +279,33 @@ class PlotWindow(Window):
                 size=imgui.ImVec2(-1, total_h),
                 flags=flags,
             ):
-                for plot_cfg in plots:
-                    self._render_plot(plot_cfg, task)
+                for i, plot_cfg in enumerate(plots):
+                    self._render_plot(plot_cfg, task, i)
                 implot.end_subplots()
         finally:
             self._pop_plot_style()
             if needs_scroll:
                 imgui.end_child()
 
+        if self._plot_to_remove is not None and self._plot_to_remove < len(plots):
+            self.config.plots.pop(self._plot_to_remove)
+
     def _render_tabs(self, task):
+        self._plot_to_remove = None
         self._push_plot_style()
         if imgui.begin_tab_bar(f"##{self._window_id}_tabs"):
-            for plot_cfg in self.config.plots:
-                if imgui.begin_tab_item(plot_cfg.title or "Plot")[0]:
-                    self._render_plot(plot_cfg, task)
+            for i, plot_cfg in enumerate(self.config.plots):
+                if imgui.begin_tab_item(f"{plot_cfg.title or 'Plot'}##tab_{i}")[0]:
+                    self._render_plot(plot_cfg, task, i)
                     imgui.end_tab_item()
             imgui.end_tab_bar()
         self._pop_plot_style()
 
-    # ── Unified plot renderer ────────────────────────────────────────
+        if self._plot_to_remove is not None and self._plot_to_remove < len(self.config.plots):
+            self.config.plots.pop(self._plot_to_remove)
 
-    def _render_plot(self, plot_cfg: PlotConfig, task):
+    # Unified plot renderer
+    def _render_plot(self, plot_cfg: PlotConfig, task, plot_index: int = 0):
         registry = self._extension.registry
         iteration = self._extension.view_iteration
         buf_size = task.buffer_size
@@ -409,8 +389,10 @@ class PlotWindow(Window):
                     implot.plot_line(label, y_data, xscale, xstart, spec)
 
                 elif is_index:
-                    # Plot against array indices
-                    implot.plot_line(label, y_data)
+                    # Plot against array indices with ring buffer offset
+                    spec = implot.Spec()
+                    spec.offset = ring_offset
+                    implot.plot_line(label, y_data, 1.0, 0.0, spec)
 
                 elif x_data is not None:
                     # XY: live data with ring buffer offset
@@ -427,3 +409,4 @@ class PlotWindow(Window):
                     )
 
             implot.end_plot()
+            self._render_plot_context_menu(plot_cfg, plot_index)
