@@ -1,10 +1,7 @@
 """ Main script to run the FARMS app """
 
 import time
-from typing import List
 
-# from farms_app.core.options import ApplicationOptions
-import numpy as np
 from farms_app.backends.base import BaseBackend
 from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
@@ -13,11 +10,10 @@ from farms_app.core.extension import ExtensionManager
 from farms_app.core.profiler import FrameTimer
 from farms_app.utils import paths
 from farms_core import pylog
-from imgui_bundle import imgui, implot
+from imgui_bundle import imgui
 
 from .menus import render_main_menu
 from .options import ApplicationOptions
-
 
 _DEFAULT_OPTIONS_FILE = "options.yaml"
 
@@ -51,6 +47,7 @@ class FARMSApplication:
 
         # Setup extensions
         self.extension_manager = ExtensionManager()
+        self.extension_manager._saved_state = self._options.extension.state
 
         # Dockspace
         self.dockspace_id: int = 0
@@ -92,16 +89,21 @@ class FARMSApplication:
         """ Initialize using options """
         return cls(options)
 
-    @classmethod
-    def from_file(cls, path: str = _DEFAULT_OPTIONS_FILE):
-        """Load options from YAML and initialize. Falls back to defaults."""
+    @staticmethod
+    def load_options(path: str = _DEFAULT_OPTIONS_FILE) -> ApplicationOptions:
+        """Load options from YAML. Falls back to defaults."""
         import os
         if os.path.exists(path):
             options = ApplicationOptions.load(path)
             pylog.info(f"Loaded options from {path}")
         else:
-            options = ApplicationOptions()
-        return cls(options, options_path=path)
+            options = ApplicationOptions.defaults()
+        return options
+
+    @classmethod
+    def from_file(cls, path: str = _DEFAULT_OPTIONS_FILE):
+        """Load options from YAML and initialize. Falls back to defaults."""
+        return cls(cls.load_options(path), options_path=path)
 
     def render_menu(self):
         """ Render menu """
@@ -142,9 +144,8 @@ class FARMSApplication:
 
                 if _first:
                     self.extension_manager.dockspace_id = self.dockspace_id
-                    for ext_name in self._options.auto_enable:
+                    for ext_name in self._options.extension.auto_enable:
                         self.extension_manager.enable(ext_name)
-                    self.extension_manager.load_state(self._options.extension.state)
                     _first = False
 
                 # Tick all extensions: update(dt) -> event() -> render()
@@ -159,6 +160,7 @@ class FARMSApplication:
             pylog.info("Interrupted — saving state")
         finally:
             # Save extension state into options and write to disk
+            self._options.extension.auto_enable = list(self.extension_manager._enabled_exts.keys())
             self._options.extension.state = self.extension_manager.save_state()
             try:
                 self._options.save(self._options_path)

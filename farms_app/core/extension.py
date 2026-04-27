@@ -30,6 +30,7 @@ class ExtensionManager:
         self._enabled_exts: dict[str, EnabledExtension] = {}
         self.frame_timer = None  # set by FARMSApplication
         self.dockspace_id: int = 0  # set by FARMSApplication
+        self._saved_state: dict = {}  # set by FARMSApplication
 
         self._mgr = EnabledExtensionManager(
             namespace=EXTENSION_NAMESPACE,
@@ -86,6 +87,9 @@ class ExtensionManager:
                 obj=ext_obj,
             )
             ext_obj.on_enable()
+            if name in self._saved_state:
+                ext_obj.on_restore_state(self._saved_state[name])
+                pylog.info(f"Restored state for {name}")
             pylog.info(f"Enabled extension {name}")
             return True
         except Exception as e:
@@ -145,18 +149,6 @@ class ExtensionManager:
             except Exception as e:
                 pylog.error(f"Error saving state for {name}: {e}")
         return state
-
-    def load_state(self, state: dict):
-        """Restore extension state from a dict."""
-        if not state:
-            return
-        for name, ext_state in state.items():
-            if name in self._enabled_exts:
-                try:
-                    self._enabled_exts[name].obj.on_restore_state(ext_state)
-                    pylog.info(f"Restored state for {name}")
-                except Exception as e:
-                    pylog.error(f"Error restoring state for {name}: {e}")
 
     def shutdown(self):
         """Disable and cleanup all enabled extensions. Called on app exit."""
