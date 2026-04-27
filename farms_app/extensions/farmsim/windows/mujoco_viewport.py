@@ -84,9 +84,25 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
 
         self._render_scene()
 
+    def _resize(self, width: int, height: int):
+        """Resize framebuffer and MuJoCo viewport to new dimensions."""
+        self.width = width
+        self.height = height
+        self.fb.resize(width, height)
+        self.mj_viewport.width = width
+        self.mj_viewport.height = height
+
     def _render_scene(self):
         """Render MuJoCo scene to framebuffer and display as ImGui image."""
         self._viewer_pos = imgui.get_cursor_screen_pos()
+
+        avail_w, avail_h = imgui.get_content_region_avail()
+        if avail_w <= 0 or avail_h <= 0:
+            return
+
+        new_w, new_h = int(avail_w), int(avail_h)
+        if new_w != self.width or new_h != self.height:
+            self._resize(new_w, new_h)
 
         self.fb.bind()
         mujoco.mjv_updateScene(
@@ -98,22 +114,9 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
         self.fb.unbind()
         self.fb.resolve()
 
-        # Fit image to available space preserving aspect ratio
-        avail_w, avail_h = imgui.get_content_region_avail()
-        if avail_w <= 0 or avail_h <= 0:
-            return
-
-        aspect = self.width / self.height
-        if avail_w / avail_h > aspect:
-            draw_h = avail_h
-            draw_w = aspect * draw_h
-        else:
-            draw_w = avail_w
-            draw_h = draw_w / aspect
-
         imgui.image(
             imgui.ImTextureRef(self.fb.texture_id),
-            imgui.ImVec2(draw_w, draw_h),
+            imgui.ImVec2(avail_w, avail_h),
             uv0=imgui.ImVec2(1, 1),
             uv1=imgui.ImVec2(0, 0),
         )
