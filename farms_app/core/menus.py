@@ -89,10 +89,11 @@ def render_main_menu(app):
         if clicked:
             app.frame_timer.enabled = new_state
         if imgui.begin_menu("Level"):
-            for level in ("debug", "info", "warning"):
+            _curr_level = pylog.get_level()
+            for level in ("debug", "info", "warning", "error", "critical"):
                 if imgui.menu_item(
                     level, shortcut="",
-                    p_selected=(pylog.get_level() == level),
+                    p_selected=(_curr_level == level),
                 )[0]:
                     pylog.set_level(level)
             imgui.end_menu()
