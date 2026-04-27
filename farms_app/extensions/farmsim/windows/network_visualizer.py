@@ -76,6 +76,7 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         self._edge_weights = []
         self._external_input_nodes = []
         self._network_ready = False
+        self._needs_fit = False
 
     @property
     def network(self):
@@ -100,7 +101,15 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
             if hasattr(node_data, 'external_input') and node_data.external_input is not None:
                 self._external_input_nodes.append(node_data.name)
 
+        # Compute bounding box for initial fit
+        positions = [n.visual['position'][:2] for n in net.options.nodes]
+        xs = [p[0] for p in positions]
+        ys = [p[1] for p in positions]
+        pad = 0.5
+        self._bounds = (min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad)
+
         self._network_ready = True
+        self._needs_fit = True
 
     def on_render(self):
         if self.network is None:
@@ -177,6 +186,11 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         if implot.begin_plot("##network_vis", size=(-1, -1), flags=implot.Flags_.equal):
             implot.setup_axis(implot.ImAxis_.x1, flags=axis_flags)
             implot.setup_axis(implot.ImAxis_.y1, flags=axis_flags)
+            if self._needs_fit:
+                x_min, x_max, y_min, y_max = self._bounds
+                implot.setup_axis_limits(implot.ImAxis_.x1, x_min, x_max)
+                implot.setup_axis_limits(implot.ImAxis_.y1, y_min, y_max)
+                self._needs_fit = False
 
             draw_list = implot.get_plot_draw_list()
 
