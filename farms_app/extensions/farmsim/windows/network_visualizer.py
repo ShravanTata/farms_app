@@ -17,8 +17,7 @@ def _col32(rgba):
     return imgui.color_convert_float4_to_u32(rgba)
 
 
-# ── Visual style ─────────────────────────────────────────────────────
-
+# Visual style
 class _Style:
     node_radius = 14
     node_shadow_offset = (2, 2)
@@ -65,8 +64,7 @@ def _abbreviate(name):
     return name
 
 
-# ── Window ───────────────────────────────────────────────────────────
-
+# Window
 class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
     """Interactive network topology diagram with live activation coloring."""
 
@@ -120,60 +118,9 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         if not self._network_ready:
             self._setup_network()
 
-        self._draw_input_controls()
-        self._draw_weight_table()
         self._draw_diagram()
 
-    # ── External input controls ──────────────────────────────────────
-
-    def _draw_input_controls(self):
-        net = self.network
-        if imgui.collapsing_header("Drives"):
-            for node_name in self._external_input_nodes:
-                node_data = net.data.nodes[node_name]
-                _, node_data.external_input.values = imgui.drag_float(
-                    node_name,
-                    float(node_data.external_input.values),
-                    v_speed=0.05, v_min=0.0, v_max=1.5,
-                )
-
-    # ── Weight table ─────────────────────────────────────────────────
-
-    def _draw_weight_table(self):
-        net = self.network
-        flags = (
-            imgui.TableFlags_.borders |
-            imgui.TableFlags_.row_bg |
-            imgui.TableFlags_.resizable
-        )
-        if imgui.collapsing_header("Weights"):
-            if imgui.begin_table("##edges", 3, flags):
-
-                for col in ("Source", "Target", "Weight"):
-                    imgui.table_setup_column(col)
-                imgui.table_headers_row()
-
-                for row, edge in enumerate(net.data.edges):
-                    imgui.table_next_row()
-                    imgui.table_set_column_index(0)
-                    imgui.text(edge.source)
-                    imgui.table_set_column_index(1)
-                    imgui.text(edge.target)
-                    imgui.table_set_column_index(2)
-                    imgui.push_id(row)
-
-                    # weight_pos = np.where(edge_indices == row)[0][0]
-                    w = float(edge.weight.values)
-                    _min, _max = (-10.0, 0.0) if w < 0.0 else (0.0, 10.0)
-                    _, edge.weight.values = imgui.drag_float(
-                        "##w", w, v_speed=0.05, v_min=_min, v_max=_max,
-                    )
-                    imgui.pop_id()
-
-                imgui.end_table()
-
-    # ── Diagram ──────────────────────────────────────────────────────
-
+    # Diagram
     def _draw_diagram(self):
         net = self.network
         nodes = net.options.nodes
@@ -263,8 +210,7 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
                 draw_list.add_text((lx, ly), col, label)
                 placed.append((lx, ly, lw, lh))
 
-    # ── Edge drawing ─────────────────────────────────────────────────
-
+    # Edge drawing
     def _draw_edges(self, draw_list):
         theme = _theme_colors()
         for i, (p1_plot, p2_plot) in enumerate(self._edges_p1p2):
@@ -343,8 +289,7 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
 
         draw_list.add_triangle_filled(tip, left, right, color)
 
-    # ── Node drawing ─────────────────────────────────────────────────
-
+    # Node drawing
     def _draw_node(self, draw_list, name, pos, radius, base_color, activation=0.0):
         r = radius
         ox, oy = _style.node_shadow_offset

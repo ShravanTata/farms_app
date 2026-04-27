@@ -47,13 +47,16 @@ class PropertiesWindow(Window["FARMSIMExtension"]):
             imgui.text("No simulation loaded")
             return
 
+        imgui.separator_text("Sim")
         self._render_sim_info()
+        imgui.separator_text("Network")
         self._render_relay_control()
+        self._render_weights()
+        imgui.separator_text("Physics")
         self._render_physics_options()
         self._render_selected_body()
 
-    # ── Simulation info ──────────────────────────────────────────────
-
+    # Simulation info
     def _render_sim_info(self):
         if imgui.collapsing_header("Simulation", imgui.TreeNodeFlags_.default_open):
             task = self._extension.task
@@ -64,8 +67,7 @@ class PropertiesWindow(Window["FARMSIMExtension"]):
             imgui.text(f"State: {self._extension.playback_state}")
             imgui.text(f"Speed: {self._extension.playback_speed}x")
 
-    # ── Physics options ──────────────────────────────────────────────
-
+    # Physics options
     def _render_physics_options(self):
         if not imgui.collapsing_header("Physics"):
             return
@@ -123,8 +125,7 @@ class PropertiesWindow(Window["FARMSIMExtension"]):
         if changed:
             opt.gravity[:] = grav
 
-    # ── Relay neuron control ─────────────────────────────────────────
-
+    # Relay neuron control
     def _render_relay_control(self):
         network = self._extension.network
         if network is None:
@@ -163,8 +164,43 @@ class PropertiesWindow(Window["FARMSIMExtension"]):
             format=f"{name}  %.3f",
         )
 
-    # ── Selected body info ───────────────────────────────────────────
+    # Network weights
+    def _render_weights(self):
+        network = self._extension.network
+        if network is None:
+            return
 
+        if not imgui.collapsing_header("Weights"):
+            return
+
+        flags = (
+            imgui.TableFlags_.borders
+            | imgui.TableFlags_.row_bg
+            | imgui.TableFlags_.resizable
+        )
+        if imgui.begin_table("##weights", 3, flags):
+            for col in ("Source", "Target", "Weight"):
+                imgui.table_setup_column(col)
+            imgui.table_headers_row()
+
+            for row, edge in enumerate(network.data.edges):
+                imgui.table_next_row()
+                imgui.table_set_column_index(0)
+                imgui.text(edge.source)
+                imgui.table_set_column_index(1)
+                imgui.text(edge.target)
+                imgui.table_set_column_index(2)
+                imgui.push_id(row)
+                w = float(edge.weight.values)
+                _min, _max = (-10.0, 0.0) if w < 0.0 else (0.0, 10.0)
+                _, edge.weight.values = imgui.drag_float(
+                    "##w", w, v_speed=0.05, v_min=_min, v_max=_max,
+                )
+                imgui.pop_id()
+
+            imgui.end_table()
+
+    # Selected body info
     def _render_selected_body(self):
         if not imgui.collapsing_header("Selected Body"):
             return
