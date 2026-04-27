@@ -1,7 +1,6 @@
 """ Options for FARMS Application """
 
-from enum import Enum
-from typing import Any, Iterable, Self, Type, Union
+from typing import Dict, Iterable, List
 
 from farms_app.backends.manager import PlatformType, RendererType
 from farms_core.options import Options
@@ -10,53 +9,84 @@ from farms_core.options import Options
 class BackendOptions(Options):
     """ Backend renderer options """
 
-    def __init__(self):
+    def __init__(self, platform: str, renderer: str):
         super().__init__()
-        self.platform = PlatformType.GLFW.value
-        self.renderer = RendererType.OPENGL2.value
+        self.platform = platform
+        self.renderer = renderer
 
+    @classmethod
+    def defaults(cls):
+        return cls(
+            platform=PlatformType.GLFW.value,
+            renderer=RendererType.OPENGL2.value,
+        )
 
-class PlatformOptions(Options):
-    """ Base class for different types of platform options """
-
-    def __init__(self):
-        ...
-
-
-class LaunchOptions(Options):
-    """ Setup options to configure the interface at launch  """
-
-    def __init__(self, **kwargs):
-        self.title = kwargs.pop("title", "FARMS")  # FARMS by default
-        self.geometry: Iterable[int, int] = kwargs.pop("geometry", [720, 1080])
-        self.resizable: bool = kwargs.pop("resizable", True)
+    @classmethod
+    def from_options(cls, opts: Dict):
+        return cls(
+            platform=opts.get("platform", PlatformType.GLFW.value),
+            renderer=opts.get("renderer", RendererType.OPENGL2.value),
+        )
 
 
 class WindowOptions(Options):
     """ Window options """
 
-    def __init__(self, **kwargs):
+    def __init__(self, vsync: bool, fullscreen: bool):
         super().__init__()
-        self.vsync = kwargs.pop("vsync", True)
-        self.fullscreen = kwargs.pop("fullscreen", False)
+        self.vsync = vsync
+        self.fullscreen = fullscreen
+
+    @classmethod
+    def defaults(cls):
+        return cls(vsync=True, fullscreen=False)
+
+    @classmethod
+    def from_options(cls, opts: Dict):
+        return cls(
+            vsync=opts.get("vsync", True),
+            fullscreen=opts.get("fullscreen", False),
+        )
 
 
 class DockingOptions(Options):
     """ Docking Options """
 
-    def __init__(self, **kwargs):
+    def __init__(self, enabled: bool, layout_config: str = None):
         super().__init__()
-        self.enabled = kwargs.pop("enabled", True)
-        self.layout_config = kwargs.pop("layout_config", None)
+        self.enabled = enabled
+        self.layout_config = layout_config
+
+    @classmethod
+    def defaults(cls):
+        return cls(enabled=True, layout_config=None)
+
+    @classmethod
+    def from_options(cls, opts: Dict):
+        return cls(
+            enabled=opts.get("enabled", True),
+            layout_config=opts.get("layout_config", None),
+        )
 
 
 class ExtensionOptions(Options):
     """Extension Options """
 
-    def __init__(self, **kwargs):
+    def __init__(self, auto_enable: List[str], state: dict):
         super().__init__()
-        self.auto_load = kwargs.pop("auto_load", True)
-        self.state = kwargs.pop("state", {})
+        self.auto_enable = auto_enable
+        self.state = state
+
+    @classmethod
+    def defaults(cls):
+        return cls(auto_enable=["status_bar"], state={})
+
+    @classmethod
+    def from_options(cls, opts: Dict):
+        return cls(
+            auto_enable=opts.get("auto_enable", ["status_bar"]),
+            state=opts.get("state", {}),
+        )
 
 
 class FontOptions(Options):
@@ -68,13 +98,17 @@ class FontOptions(Options):
         self.size = size
 
     @classmethod
-    def defaults(cls, **kwargs):
-        """ Defaults """
-        name: str = kwargs.pop("name", "JetBrainsMono[wght].ttf")
-        size: int = kwargs.pop("size", 16)
-        return FontOptions(
-            name=name,
-            size=size
+    def defaults(cls):
+        return cls(
+            name="JetBrainsMono[wght].ttf",
+            size=16,
+        )
+
+    @classmethod
+    def from_options(cls, opts: Dict):
+        return cls(
+            name=opts.get("name", "JetBrainsMono[wght].ttf"),
+            size=opts.get("size", 16),
         )
 
 
@@ -83,53 +117,66 @@ class ApplicationOptions(Options):
 
     def __init__(
             self,
-            backend_options: BackendOptions = BackendOptions(),
-            window_options: WindowOptions = WindowOptions(),
-            docking_options: DockingOptions = DockingOptions(),
-            extension_options: ExtensionOptions = ExtensionOptions(),
-            **kwargs
+            title: str,
+            geometry: List[int],
+            resizable: bool,
+            backend: BackendOptions,
+            window: WindowOptions,
+            docking: DockingOptions,
+            extension: ExtensionOptions,
+            fonts: FontOptions,
+            fps: float,
+            fps_idle: float,
+            enable_idling: bool,
     ):
-        "Initialize"
         super().__init__()
+        self.title = title
+        self.geometry = geometry
+        self.resizable = resizable
+        self.backend = backend
+        self.window = window
+        self.docking = docking
+        self.extension = extension
+        self.fonts = fonts
+        self.fps = fps
+        self.fps_idle = fps_idle
+        self.enable_idling = enable_idling
 
-        # Main
-        self.title = kwargs.pop("title", "FARMS")  # FARMS by default
-        self.geometry: Iterable[int, int] = kwargs.pop("geometry", [720, 1080])
-        self.resizable: bool = kwargs.pop("resizable", True)
+    @classmethod
+    def defaults(cls, **kwargs):
+        return cls(
+            title=kwargs.pop("title", "FARMS"),
+            geometry=kwargs.pop("geometry", [720, 1080]),
+            resizable=kwargs.pop("resizable", True),
+            backend=kwargs.pop("backend", BackendOptions.defaults()),
+            window=kwargs.pop("window", WindowOptions.defaults()),
+            docking=kwargs.pop("docking", DockingOptions.defaults()),
+            extension=kwargs.pop("extension", ExtensionOptions.defaults()),
+            fonts=kwargs.pop("fonts", FontOptions.defaults()),
+            fps=kwargs.pop("fps", 60),
+            fps_idle=kwargs.pop("fps_idle", 9.0),
+            enable_idling=kwargs.pop("enable_idling", False),
+        )
 
-        # Imgui Ini options. Imgui uses ini files to save and restore the state of the
-        # app and this can be used in conjunction to the FARMS options to either
-        # override or save use preferences.
+    @classmethod
+    def load(cls, file_path: str):
+        """Load from file, reconstructing sub-option objects."""
+        opts = Options.load(file_path)
+        return cls.from_options(opts)
 
-        # Backend options
-        self.backend = backend_options
-
-        # Window options
-        self.window = window_options
-
-        # Docking options
-        self.docking = docking_options
-
-        # Extension options
-        self.extension = extension_options
-
-        # FPS
-        self.fps: float = kwargs.pop("fps", 60)
-        self.fps_idle: float = kwargs.pop("fps_idle", 9.0)
-        self.enable_idling: bool = kwargs.pop("enable_idling", False)
-
-        # Extensions to enable on startup
-        self.auto_enable: list[str] = kwargs.pop("auto_enable", ["status_bar"])
-
-        # Font options
-        self.fonts: FontOptions = kwargs.pop("font_options", FontOptions.defaults())
-
-
-if __name__ == '__main__':
-    opts = ApplicationOptions(
-        BackendOptions(),
-        WindowOptions(),
-        DockingOptions(),
-        ExtensionOptions(),
-    )
-    opts.save("/tmp/app.yaml")
+    @classmethod
+    def from_options(cls, opts: Dict):
+        """Construct from a dict (e.g. parsed YAML)."""
+        return cls(
+            title=opts.get("title", "FARMS"),
+            geometry=opts.get("geometry", [720, 1080]),
+            resizable=opts.get("resizable", True),
+            backend=BackendOptions.from_options(opts["backend"]) if "backend" in opts else BackendOptions.defaults(),
+            window=WindowOptions.from_options(opts["window"]) if "window" in opts else WindowOptions.defaults(),
+            docking=DockingOptions.from_options(opts["docking"]) if "docking" in opts else DockingOptions.defaults(),
+            extension=ExtensionOptions.from_options(opts["extension"]) if "extension" in opts else ExtensionOptions.defaults(),
+            fonts=FontOptions.from_options(opts["fonts"]) if "fonts" in opts else FontOptions.defaults(),
+            fps=opts.get("fps", 60),
+            fps_idle=opts.get("fps_idle", 9.0),
+            enable_idling=opts.get("enable_idling", False),
+        )
