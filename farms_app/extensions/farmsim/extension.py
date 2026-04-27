@@ -62,6 +62,8 @@ class FARMSIMExtension(Extension):
         self._network_vis_win = NetworkVisualizerWindow(self)
         self.register_window(self._network_vis_win)
         self._bottom_dock_id = 0
+        self._new_plot_name = ""
+        self._show_new_plot_popup = False
 
     def on_enable(self):
         from farms_app.core import layout
@@ -175,7 +177,9 @@ class FARMSIMExtension(Extension):
             imgui.separator()
             if imgui.begin_menu("Add", enabled=self.sim is not None):
                 if imgui.menu_item_simple("Plot Window"):
-                    self._add_plot_window()
+                    FARMSIMExtension._PLOT_WINDOW_COUNTER += 1
+                    self._new_plot_name = f"Plot {FARMSIMExtension._PLOT_WINDOW_COUNTER}"
+                    self._show_new_plot_popup = True
                 imgui.end_menu()
             imgui.separator()
             if imgui.begin_menu("Windows"):
@@ -187,6 +191,24 @@ class FARMSIMExtension(Extension):
                         window.toggle_visibility()
                 imgui.end_menu()
             imgui.end_menu()
+
+        # New plot window name popup
+        if self._show_new_plot_popup:
+            imgui.open_popup("##new_plot_name")
+            self._show_new_plot_popup = False
+        if imgui.begin_popup("##new_plot_name"):
+            imgui.text("Plot window name:")
+            imgui.set_keyboard_focus_here()
+            confirmed, self._new_plot_name = imgui.input_text(
+                "##name", self._new_plot_name,
+                imgui.InputTextFlags_.enter_returns_true,
+            )
+            if confirmed and self._new_plot_name:
+                self._add_plot_window(self._new_plot_name)
+                imgui.close_current_popup()
+            if imgui.is_key_pressed(imgui.Key.escape):
+                imgui.close_current_popup()
+            imgui.end_popup()
 
     # Experiment loading
     def load_experiment(self, path: str = None):
@@ -235,14 +257,14 @@ class FARMSIMExtension(Extension):
         if hasattr(self, '_experiment_path'):
             self.load_experiment(self._experiment_path)
 
-    def _add_plot_window(self):
+    def _add_plot_window(self, name: str = None):
         """Create a new empty plot window the user can configure."""
-        FARMSIMExtension._PLOT_WINDOW_COUNTER += 1
-        n = FARMSIMExtension._PLOT_WINDOW_COUNTER
-        win = PlotWindow(self, PlotWindowConfig(name=f"Plot {n}"))
+        if name is None:
+            FARMSIMExtension._PLOT_WINDOW_COUNTER += 1
+            name = f"Plot {FARMSIMExtension._PLOT_WINDOW_COUNTER}"
+        win = PlotWindow(self, PlotWindowConfig(name=name))
         self.register_window(win)
         win.initialize()
-        win._show_config = True
         if self._bottom_dock_id:
             from farms_app.core import layout
             layout.dock_window(win.window_id, self._bottom_dock_id)
