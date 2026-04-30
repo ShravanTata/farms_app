@@ -32,6 +32,7 @@ class FARMSIMExtension(Extension):
         super().__init__(name="FARMSIM")
         self.hooks.add("pre_substep")
         self.hooks.add("post_substep")
+        self.hooks.add("create_default_plots")
         self.sim = None
         self.registry = DataRegistry()
 
@@ -252,7 +253,7 @@ class FARMSIMExtension(Extension):
 
             # Restore saved plot windows, or create defaults
             if not self._restore_plot_windows():
-                self._add_plot_window()
+                self._create_default_plot_windows()
             self.init_windows()
 
         except Exception as e:
@@ -264,6 +265,13 @@ class FARMSIMExtension(Extension):
         """Reload the current experiment from disk."""
         if hasattr(self, '_experiment_path'):
             self.load_experiment(self._experiment_path)
+
+    def _create_default_plot_windows(self):
+        """Create default plot windows. Connect to ``create_default_plots`` hook to override."""
+        if self.hooks["create_default_plots"]:
+            self.hooks["create_default_plots"].fire(self)
+        else:
+            self._add_plot_window()
 
     def _add_plot_window(self, name: str = None):
         """Create a new empty plot window the user can configure."""
@@ -379,7 +387,7 @@ class FARMSIMExtension(Extension):
             self.unregister_window(self.windows[name])
         # Recreate defaults
         if self.sim is not None:
-            self._add_plot_window()
+            self._create_default_plot_windows()
             self.init_windows()
 
     def _restore_plot_windows(self):
