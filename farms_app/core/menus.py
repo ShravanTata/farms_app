@@ -42,6 +42,9 @@ def render_main_menu(app):
 
     # File
     if imgui.begin_menu("File"):
+        if imgui.menu_item_simple("Restore Defaults"):
+            app.extension_manager.reset_all_state()
+        imgui.separator()
         if imgui.menu_item_simple("Quit", shortcut="Alt+Q"):
             app.backend.request_close()
         imgui.end_menu()

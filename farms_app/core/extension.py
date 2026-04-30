@@ -153,6 +153,16 @@ class ExtensionManager:
                 pylog.error(f"Error saving state for {name}: {e}")
         return state
 
+    def reset_all_state(self):
+        """Reset state for all enabled extensions to defaults."""
+        self._saved_state = {}
+        for name, ee in self._enabled_exts.items():
+            try:
+                ee.obj.on_reset_state()
+                pylog.info(f"Reset state for {name}")
+            except Exception as e:
+                pylog.error(f"Error resetting state for {name}: {e}")
+
     def shutdown(self):
         """Disable and cleanup all enabled extensions. Called on app exit."""
         for name in list(self._enabled_exts):
@@ -293,6 +303,9 @@ class Extension:
 
     def on_restore_state(self, state: dict):
         """Restore state from a previous run. Override to load custom state."""
+
+    def on_reset_state(self):
+        """Reset extension state to defaults. Override to handle cleanup."""
 
     def dependencies(self):
         """Return list of extension names this depends on."""
