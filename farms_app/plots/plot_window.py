@@ -56,6 +56,7 @@ class PlotConfig:
     y_sources: list[str] = field(default_factory=list)
     title: str = ""
     y_label: str = ""
+    y_limits: tuple[float, float] | None = None  # (min, max) or None for auto
     reference_curves: list[ReferenceCurve] = field(default_factory=list)
 
 
@@ -375,7 +376,7 @@ class PlotWindow(Window):
                 flags=flags,
             ):
                 for i, plot_cfg in enumerate(plots):
-                    self._render_plot(plot_cfg, task, i)
+                    self._render_plot(plot_cfg, task, i, len(plots))
                 implot.end_subplots()
         finally:
             self._pop_plot_style()
@@ -393,7 +394,10 @@ class PlotWindow(Window):
         self._pop_plot_style()
 
     # Unified plot renderer
-    def _render_plot(self, plot_cfg: PlotConfig, task, plot_index: int = 0):
+    def _render_plot(
+        self, plot_cfg: PlotConfig, task,
+        plot_index: int = 0, plot_count: int = 1,
+    ):
         registry = self._extension.registry
         iteration = self._extension.view_iteration
         buf_size = task.buffer_size
@@ -402,6 +406,7 @@ class PlotWindow(Window):
         is_time = x_src == "time"
         is_index = x_src == "index"
         is_data = not is_time and not is_index
+        is_last = plot_index == plot_count - 1
 
         title = f"{plot_cfg.title}##{self._window_id}_{id(plot_cfg)}"
         plot_flags = implot.Flags_.no_title
@@ -409,9 +414,12 @@ class PlotWindow(Window):
         if implot.begin_plot(title, flags=plot_flags):
             # X axis setup
             if is_time:
+                x_flags = implot.AxisFlags_.lock | implot.AxisFlags_.no_label
+                if not is_last:
+                    x_flags |= implot.AxisFlags_.no_tick_labels
                 implot.setup_axis(
                     implot.ImAxis_.x1, "",
-                    flags=implot.AxisFlags_.lock | implot.AxisFlags_.no_label,
+                    flags=x_flags,
                 )
                 implot.setup_axis_limits(implot.ImAxis_.x1, -1.0, 0.0, implot.Cond_.always)
             elif is_index:
@@ -425,10 +433,17 @@ class PlotWindow(Window):
 
             # Y axis
             y_label = plot_cfg.y_label if plot_cfg.y_label else ""
+            y_flags = implot.AxisFlags_.range_fit
             implot.setup_axis(
                 implot.ImAxis_.y1, y_label,
-                flags=implot.AxisFlags_.range_fit,
+                flags=y_flags,
             )
+            if plot_cfg.y_limits is not None:
+                implot.setup_axis_limits(
+                    implot.ImAxis_.y1,
+                    plot_cfg.y_limits[0], plot_cfg.y_limits[1],
+                    implot.Cond_.always,
+                )
 
             # Legend
             implot.setup_legend(

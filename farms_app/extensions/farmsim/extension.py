@@ -348,6 +348,7 @@ class FARMSIMExtension(Extension):
                         "y_sources": list(p.y_sources),
                         "title": p.title,
                         "y_label": p.y_label,
+                        "y_limits": list(p.y_limits) if p.y_limits is not None else None,
                     }
                     for p in cfg.plots
                 ],
@@ -384,6 +385,7 @@ class FARMSIMExtension(Extension):
                     y_sources=p.get("y_sources", []),
                     title=p.get("title", ""),
                     y_label=p.get("y_label", ""),
+                    y_limits=tuple(p["y_limits"]) if p.get("y_limits") is not None else None,
                 )
                 for p in cfg_dict.get("plots", [])
             ]
