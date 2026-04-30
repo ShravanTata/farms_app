@@ -3,6 +3,7 @@
 import inspect
 
 from farms_app.console import console
+from farms_app.core.hooks import Hooks
 from farms_app.core.window import Window
 from farms_core import pylog
 from imgui_bundle import imgui
@@ -123,7 +124,9 @@ class ExtensionManager:
                 if ft:
                     ft.begin_scope(name)
                     ft.begin_phase("update")
+                enabled_ext.obj.pre_update(dt)
                 enabled_ext.obj.on_update(dt)
+                enabled_ext.obj.post_update(dt)
                 if ft:
                     ft.end_phase("update")
                     ft.begin_phase("event")
@@ -200,6 +203,7 @@ class Extension:
         self.hide: bool = False
         self.dockspace_id: int = 0
         self.windows: dict[str, Window] = {}
+        self.hooks = Hooks("pre_update", "post_update")
 
     ###########
     # Windows #
@@ -238,7 +242,8 @@ class Extension:
         """Called when extension is about to be disabled."""
 
     def pre_update(self, dt: float):
-        """ Called to setup before on_update """
+        """Called before on_update. Fires pre_update hooks."""
+        self.hooks["pre_update"].fire(self, dt)
 
     def on_update(self, dt: float):
         """Called once per frame with frame delta time.
@@ -248,7 +253,8 @@ class Extension:
         """
 
     def post_update(self, dt: float):
-        """ Called for any clean-up changes post on_update call """
+        """Called after on_update. Fires post_update hooks."""
+        self.hooks["post_update"].fire(self, dt)
 
     def on_event(self):
         """Called once per frame for input handling."""
