@@ -30,6 +30,8 @@ class FARMSIMExtension(Extension):
 
     def __init__(self):
         super().__init__(name="FARMSIM")
+        self.hooks.add("pre_substep")
+        self.hooks.add("post_substep")
         self.sim = None
         self.registry = DataRegistry()
 
@@ -159,7 +161,9 @@ class FARMSIMExtension(Extension):
                 for _ in range(task.cb_sub_steps):
                     if self._mujoco_win._initialized:
                         self._mujoco_win.apply_perturbation()
+                    self.hooks["pre_substep"].fire(self, task.iteration, self.sim.physics)
                     self.sim._env.step(action=None)
+                    self.hooks["post_substep"].fire(self, task.iteration, self.sim.physics)
         else:
             # Rewind view index (no physics rewind)
             new_iter = max(0, task.iteration + n)
@@ -228,6 +232,7 @@ class FARMSIMExtension(Extension):
             original_cwd = os.getcwd()
             os.chdir(os.path.dirname(path))
             exp = ExperimentOptions.load(path)
+            # TODO: This should be added to physics options
             exp.animats[0].mujoco = {
                 "use_site": True,
                 "use_muscles": True,
@@ -295,7 +300,9 @@ class FARMSIMExtension(Extension):
             for _ in range(task.cb_sub_steps):
                 if self._mujoco_win._initialized:
                     self._mujoco_win.apply_perturbation()
+                self.hooks["pre_substep"].fire(self, task.iteration, self.sim.physics)
                 self.sim._env.step(action=None)
+                self.hooks["post_substep"].fire(self, task.iteration, self.sim.physics)
 
     # Input & lifecycle
     def on_event(self):
