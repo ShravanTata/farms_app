@@ -442,7 +442,7 @@ class PlotWindow(Window):
                 implot.setup_axis_limits(
                     implot.ImAxis_.y1,
                     plot_cfg.y_limits[0], plot_cfg.y_limits[1],
-                    implot.Cond_.always,
+                    implot.Cond_.once,
                 )
 
             # Legend
