@@ -194,6 +194,9 @@ class FARMSIMExtension(Extension):
                     if clicked:
                         window.toggle_visibility()
                 imgui.end_menu()
+            imgui.separator()
+            if imgui.menu_item_simple("Reset Layout", enabled=self.sim is not None):
+                self.on_reset_state()
             imgui.end_menu()
 
         # New plot window name popup
@@ -333,7 +336,7 @@ class FARMSIMExtension(Extension):
         """Save plot window configs so they persist across runs."""
         # If sim is torn down, windows are gone — return cached state
         plot_windows = [w for w in self.windows.values() if isinstance(w, PlotWindow)]
-        if not plot_windows:
+        if not plot_windows and self.sim is None:
             return getattr(self, '_last_saved_state', {})
 
         plot_configs = []
@@ -342,6 +345,7 @@ class FARMSIMExtension(Extension):
             plot_configs.append({
                 "name": cfg.name,
                 "layout": cfg.layout,
+                "visible": window.visible,
                 "plots": [
                     {
                         "x_source": p.x_source,
@@ -353,6 +357,9 @@ class FARMSIMExtension(Extension):
                     for p in cfg.plots
                 ],
             })
+        # Preserve hidden plot configs from previous sessions
+        plot_configs.extend(getattr(self, '_hidden_plot_configs', []))
+
         return {
             "plot_windows": plot_configs,
             "experiment_path": getattr(self, '_experiment_path', None),
@@ -361,6 +368,19 @@ class FARMSIMExtension(Extension):
     def on_restore_state(self, state: dict):
         """Restore plot windows from saved state."""
         self._saved_state = state
+
+    def on_reset_state(self):
+        """Reset to default plot windows, clearing saved and hidden state."""
+        self._saved_state = None
+        self._hidden_plot_configs = []
+        # Remove existing plot windows
+        to_remove = [name for name, w in self.windows.items() if isinstance(w, PlotWindow)]
+        for name in to_remove:
+            self.unregister_window(self.windows[name])
+        # Recreate defaults
+        if self.sim is not None:
+            self._add_plot_window()
+            self.init_windows()
 
     def _restore_plot_windows(self):
         """Recreate plot windows from saved state. Called after experiment load."""
@@ -378,7 +398,12 @@ class FARMSIMExtension(Extension):
         if not plot_configs:
             return False
 
+        self._hidden_plot_configs = [
+            cfg for cfg in plot_configs if not cfg.get("visible", True)
+        ]
         for cfg_dict in plot_configs:
+            if not cfg_dict.get("visible", True):
+                continue
             plots = [
                 PlotConfig(
                     x_source=p.get("x_source", "time"),
