@@ -358,21 +358,13 @@ class PlotWindow(Window):
             flags |= implot.SubplotFlags_.link_all_x
 
         avail_h = imgui.get_content_region_avail().y
-        total_h = max(avail_h, len(plots) * self._MIN_SUBPLOT_HEIGHT)
-        needs_scroll = total_h > avail_h
-
-        if needs_scroll:
-            imgui.begin_child(
-                f"##{self._window_id}_scroll",
-                imgui.ImVec2(-1, -1),
-            )
 
         self._push_plot_style()
         try:
             if implot.begin_subplots(
                 f"##{self._window_id}_subplots",
                 rows=len(plots), cols=1,
-                size=imgui.ImVec2(-1, total_h),
+                size=imgui.ImVec2(-1, avail_h),
                 flags=flags,
             ):
                 for i, plot_cfg in enumerate(plots):
@@ -380,8 +372,6 @@ class PlotWindow(Window):
                 implot.end_subplots()
         finally:
             self._pop_plot_style()
-            if needs_scroll:
-                imgui.end_child()
 
     def _render_tabs(self, task):
         self._push_plot_style()
