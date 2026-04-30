@@ -52,6 +52,11 @@ class FARMSApplication:
         # Dockspace
         self.dockspace_id: int = 0
 
+        # Quit confirmation
+        self._quit_requested = False
+        self._quit_confirmed = False
+        self._save_on_quit = True
+
         # Frame timer
         self.frame_timer = FrameTimer()
         self.extension_manager.frame_timer = self.frame_timer
@@ -154,18 +159,62 @@ class FARMSApplication:
                 self.frame_timer.end_frame()
                 self.frame_timer.render_overlay()
 
+                # Quit confirmation popup
+                self._handle_quit_popup()
+
                 # End the Dear ImGui frame
                 self.backend.end_frame()
         except KeyboardInterrupt:
             pylog.info("Interrupted — saving state")
+            self._save_on_quit = True
         finally:
-            # Save extension state into options and write to disk
-            self._options.extension.auto_enable = list(self.extension_manager._enabled_exts.keys())
-            self._options.extension.state = self.extension_manager.save_state()
-            try:
-                self._options.save(self._options_path)
-                pylog.info(f"Saved options to {self._options_path}")
-            except Exception as e:
-                pylog.error(f"Error saving options: {e}")
+            if self._save_on_quit:
+                self._save_state()
             self.extension_manager.shutdown()
             self.backend.cleanup()
+
+    def _save_state(self):
+        """Save extension state into options and write to disk."""
+        self._options.extension.auto_enable = list(self.extension_manager._enabled_exts.keys())
+        self._options.extension.state = self.extension_manager.save_state()
+        try:
+            self._options.save(self._options_path)
+            pylog.info(f"Saved options to {self._options_path}")
+        except Exception as e:
+            pylog.error(f"Error saving options: {e}")
+
+    def _handle_quit_popup(self):
+        """Intercept close requests and show a confirmation popup."""
+        if self.backend.should_close() and not self._quit_confirmed:
+            self.backend.cancel_close()
+            self._quit_requested = True
+            imgui.open_popup("Quit?")
+
+        # Center the popup on the main viewport
+        center = imgui.get_main_viewport().get_center()
+        imgui.set_next_window_pos(center, imgui.Cond_.appearing, imgui.ImVec2(0.5, 0.5))
+
+        visible, _ = imgui.begin_popup_modal("Quit?", flags=imgui.WindowFlags_.always_auto_resize)
+        if not visible:
+            return
+
+        imgui.text("Save layout before quitting?")
+        imgui.spacing()
+
+        if imgui.button("Save & Quit"):
+            self._save_on_quit = True
+            self._quit_confirmed = True
+            imgui.close_current_popup()
+            self.backend.request_close()
+        imgui.same_line()
+        if imgui.button("Quit without saving"):
+            self._save_on_quit = False
+            self._quit_confirmed = True
+            imgui.close_current_popup()
+            self.backend.request_close()
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            self._quit_requested = False
+            imgui.close_current_popup()
+
+        imgui.end_popup()

@@ -239,6 +239,11 @@ class GLFWBackend(BaseBackend):
         if self.window:
             glfw.set_window_should_close(self.window, True)
 
+    def cancel_close(self):
+        """Cancel a pending close request."""
+        if self.window:
+            glfw.set_window_should_close(self.window, False)
+
     def poll_events(self):
         """ Poll GLFW events """
         glfw.poll_events()

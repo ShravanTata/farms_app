@@ -46,6 +46,10 @@ class BaseBackend(ABC):
         """Request the window to close"""
 
     @abstractmethod
+    def cancel_close(self):
+        """Cancel a pending close request."""
+
+    @abstractmethod
     def poll_events(self):
          """Poll events"""
 
