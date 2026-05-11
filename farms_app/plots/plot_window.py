@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from farms_app.core.window import Window
-from imgui_bundle import imgui, implot
+from imgui_bundle import imgui, implot, em_to_vec2
 
 
 LAYOUT_TYPES = ["subplots_vertical", "tabs"]
@@ -335,8 +335,8 @@ class PlotWindow(Window):
 
     def _push_plot_style(self):
         """Push shared aesthetic overrides for all plots."""
-        implot.push_style_var(implot.StyleVar_.plot_padding, imgui.ImVec2(8, 6))
-        implot.push_style_var(implot.StyleVar_.label_padding, imgui.ImVec2(4, 2))
+        implot.push_style_var(implot.StyleVar_.plot_padding, em_to_vec2(0.5, 0.375))
+        implot.push_style_var(implot.StyleVar_.label_padding, em_to_vec2(0.25, 0.125))
         implot.push_style_var(implot.StyleVar_.plot_border_size, 0.0)
         implot.push_style_var(implot.StyleVar_.minor_alpha, 0.15)
         implot.push_style_color(implot.Col_.plot_bg, imgui.ImVec4(0.0, 0.0, 0.0, 0.0))
@@ -448,7 +448,7 @@ class PlotWindow(Window):
                     implot.get_plot_limits().x.min * 0.99,
                     implot.get_plot_limits().y.max,
                     imgui.ImVec4(0, 0, 0, 0),
-                    imgui.ImVec2(4, 4), False, plot_cfg.title,
+                    em_to_vec2(0.25, 0.25), False, plot_cfg.title,
                 )
                 implot.pop_style_color()
 

@@ -9,7 +9,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
-from imgui_bundle import imgui
+from imgui_bundle import imgui, em_to_vec2
 
 
 @dataclass
@@ -119,7 +119,7 @@ class FrameTimer:
         if not self.enabled:
             return
 
-        imgui.set_next_window_size(imgui.ImVec2(380, 300), imgui.Cond_.first_use_ever)
+        imgui.set_next_window_size(em_to_vec2(24, 19), imgui.Cond_.first_use_ever)
         imgui.set_next_window_bg_alpha(0.85)
         expanded, self.enabled = imgui.begin("Frame Timer", self.enabled)
         if not expanded:

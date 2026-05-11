@@ -1,6 +1,6 @@
 from functools import cache
 
-from imgui_bundle import imgui, implot
+from imgui_bundle import imgui, implot, em_to_vec2
 
 
 @cache
@@ -46,8 +46,8 @@ def seaborn_style():
     style.minor_tick_size = imgui.ImVec2(0, 0)
     style.major_grid_size = imgui.ImVec2(1.2, 1.2)
     style.minor_grid_size = imgui.ImVec2(1.2, 1.2)
-    style.plot_padding = imgui.ImVec2(12, 12)
-    style.label_padding = imgui.ImVec2(5, 5)
-    style.legend_padding = imgui.ImVec2(5, 5)
-    style.mouse_pos_padding = imgui.ImVec2(5, 5)
-    style.plot_min_size = imgui.ImVec2(300, 225)
+    style.plot_padding = em_to_vec2(0.75, 0.75)
+    style.label_padding = em_to_vec2(0.3, 0.3)
+    style.legend_padding = em_to_vec2(0.3, 0.3)
+    style.mouse_pos_padding = em_to_vec2(0.3, 0.3)
+    style.plot_min_size = em_to_vec2(19, 14)

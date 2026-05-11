@@ -7,7 +7,7 @@ are reported via optional callbacks assigned on the instance.
 """
 
 from typing import Callable, Optional
-from imgui_bundle import imgui
+from imgui_bundle import imgui, em_to_vec2
 from imgui_bundle.immapp import icons_fontawesome_6 as fa6
 
 
@@ -116,7 +116,7 @@ class SimulationToolbar:
         is_active    = is_playing or is_recording
 
         style = imgui.get_style()
-        btn_size = imgui.ImVec2(32, 26)
+        btn_size = em_to_vec2(2, 1.6)
 
         # ── Navigation group: step back ────────────────────────────────────
         self._button(
@@ -194,8 +194,8 @@ class SimulationToolbar:
 
         # ── Speed cycle button ─────────────────────────────────────────────
         speed_label = f"{speed:g}x##speed"
-        imgui.push_style_var(imgui.StyleVar_.frame_padding, imgui.ImVec2(6, 4))
-        if imgui.button(speed_label, size=imgui.ImVec2(44, btn_size.y)):
+        imgui.push_style_var(imgui.StyleVar_.frame_padding, em_to_vec2(0.375, 0.25))
+        if imgui.button(speed_label, size=em_to_vec2(2.75, 1.6)):
             next_speed = self._next_speed(speed)
             if self.on_speed_change:
                 self.on_speed_change(next_speed)

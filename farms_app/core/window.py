@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generic, Optional, TypeVar
 
 from farms_app.console import console
 from farms_core import pylog
-from imgui_bundle import imgui
+from imgui_bundle import imgui, em_to_vec2
 
 if TYPE_CHECKING:
     from farms_app.core.extension import Extension
@@ -91,7 +91,7 @@ class Window(Generic[E]):
         if not self._visible:
             return
 
-        imgui.set_next_window_size(imgui.ImVec2(400, 300), imgui.Cond_.first_use_ever)
+        imgui.set_next_window_size(em_to_vec2(25, 19), imgui.Cond_.first_use_ever)
         expanded, self._visible = imgui.begin(
             self._window_id,
             self._visible,
