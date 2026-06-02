@@ -176,3 +176,27 @@ def _register_network(registry, network):
                 unit="",
                 accessor=lambda a=arr, j=_idx: a[:, j],
             ))
+
+    # States (variable number per node, indexed via log.states.indices)
+    if hasattr(log, 'states') and log.states is not None:
+        arr = log.states.array
+        indices = log.states.indices
+        node_options = network.options.nodes
+        for name, node_idx in log.nodes._name_to_index.items():
+            start = int(indices[node_idx])
+            end = int(indices[node_idx + 1])
+            if start == end:
+                continue
+            node_opt = node_options[node_idx]
+            state_names = (node_opt.state.STATE_NAMES
+                           if node_opt.state is not None else [])
+            for s in range(end - start):
+                col = start + s
+                sname = state_names[s] if s < len(state_names) else str(s)
+                source_name = f"network/states/{name}_{sname}"
+                registry.add(DataSource(
+                    name=source_name,
+                    group="network",
+                    unit="",
+                    accessor=lambda a=arr, c=col: a[:, c],
+                ))
