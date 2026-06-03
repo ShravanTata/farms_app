@@ -421,6 +421,10 @@ class FARMSIMExtension(Extension):
                     y_sources=p.get("y_sources", []),
                     title=p.get("title", ""),
                     y_label=p.get("y_label", ""),
+                    axis_limits={
+                        "x": tuple(al["x"]),
+                        "y": tuple(al["y"]),
+                    } if (al := p.get("axis_limits")) is not None else None,
                 )
                 for p in cfg_dict.get("plots", [])
             ]
@@ -430,14 +434,6 @@ class FARMSIMExtension(Extension):
                 plots=plots,
             )
             win = PlotWindow(self, config)
-            # Restore saved axis limits
-            for i, p in enumerate(cfg_dict.get("plots", [])):
-                al = p.get("axis_limits")
-                if al is not None:
-                    win._axis_limits[i] = {
-                        "x": tuple(al["x"]),
-                        "y": tuple(al["y"]),
-                    }
             self.register_window(win)
 
         return True
