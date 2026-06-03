@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "farms_app"
-version = "0.1.8"
+version = "0.1.9"
 description = "GUI Application for neuromechanical simulations using FARMS"
 readme = "README.md"
 license = "Apache-2.0"
@@ -66,6 +66,7 @@ farms_app = [
 status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
 debug = "farms_app.extensions.ui.logger:DebugExtension"
 farmsim = "farms_app.extensions.farmsim.extension:FARMSIMExtension"
+newton = "farms_app.extensions.newton.extension:NewtonExtension"
 # pendulum = "farms_app.extensions.custom.pendulum:PendulumExtension"
 # mujoco = "farms_app.extensions.custom.mujoco_impl:MuJoCoExtension"
 # experimental = "farms_app.extensions.custom.experimental:ExperimentalExtension"
