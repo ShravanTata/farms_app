@@ -360,9 +360,12 @@ class FARMSIMExtension(Extension):
                         "y_sources": list(p.y_sources),
                         "title": p.title,
                         "y_label": p.y_label,
-                        "y_limits": list(p.y_limits) if p.y_limits is not None else None,
+                        "axis_limits": {
+                            "x": list(window._axis_limits[i]["x"]),
+                            "y": list(window._axis_limits[i]["y"]),
+                        } if i in window._axis_limits else None,
                     }
-                    for p in cfg.plots
+                    for i, p in enumerate(cfg.plots)
                 ],
             })
         # Preserve hidden plot configs from previous sessions
@@ -418,7 +421,6 @@ class FARMSIMExtension(Extension):
                     y_sources=p.get("y_sources", []),
                     title=p.get("title", ""),
                     y_label=p.get("y_label", ""),
-                    y_limits=tuple(p["y_limits"]) if p.get("y_limits") is not None else None,
                 )
                 for p in cfg_dict.get("plots", [])
             ]
@@ -428,6 +430,14 @@ class FARMSIMExtension(Extension):
                 plots=plots,
             )
             win = PlotWindow(self, config)
+            # Restore saved axis limits
+            for i, p in enumerate(cfg_dict.get("plots", [])):
+                al = p.get("axis_limits")
+                if al is not None:
+                    win._axis_limits[i] = {
+                        "x": tuple(al["x"]),
+                        "y": tuple(al["y"]),
+                    }
             self.register_window(win)
 
         return True

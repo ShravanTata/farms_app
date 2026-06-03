@@ -56,7 +56,6 @@ class PlotConfig:
     y_sources: list[str] = field(default_factory=list)
     title: str = ""
     y_label: str = ""
-    y_limits: tuple[float, float] | None = None  # (min, max) or None for auto
     reference_curves: list[ReferenceCurve] = field(default_factory=list)
 
 
@@ -82,6 +81,8 @@ class PlotWindow(Window):
         self._plot_to_remove = None
         self._rename_target = None  # PlotConfig being renamed
         self._rename_buf = ""
+        # Per-plot saved axis limits: {plot_index: {"x": (min, max), "y": (min, max)}}
+        self._axis_limits: dict[int, dict] = {}
 
     def on_render(self):
         if not hasattr(self._extension, 'registry') or not hasattr(self._extension, 'task'):
@@ -428,12 +429,15 @@ class PlotWindow(Window):
                 implot.ImAxis_.y1, y_label,
                 flags=y_flags,
             )
-            if plot_cfg.y_limits is not None:
-                implot.setup_axis_limits(
-                    implot.ImAxis_.y1,
-                    plot_cfg.y_limits[0], plot_cfg.y_limits[1],
-                    implot.Cond_.once,
-                )
+            # Apply saved axis limits (once, then user can adjust freely)
+            saved = self._axis_limits.pop(plot_index, None)
+            if saved is not None:
+                if not is_time and "x" in saved:
+                    xmin, xmax = saved["x"]
+                    implot.setup_axis_limits(implot.ImAxis_.x1, xmin, xmax, implot.Cond_.once)
+                if "y" in saved:
+                    ymin, ymax = saved["y"]
+                    implot.setup_axis_limits(implot.ImAxis_.y1, ymin, ymax, implot.Cond_.once)
 
             # Legend
             implot.setup_legend(
@@ -500,5 +504,12 @@ class PlotWindow(Window):
                         np.array([float(x_data[cur_idx])], dtype=np.float64),
                         np.array([float(y_data[cur_idx])], dtype=np.float64),
                     )
+
+            # Capture current axis limits for save state
+            limits = implot.get_plot_limits()
+            self._axis_limits[plot_index] = {
+                "x": (limits.x.min, limits.x.max),
+                "y": (limits.y.min, limits.y.max),
+            }
 
             implot.end_plot()
