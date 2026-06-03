@@ -56,6 +56,7 @@ class PlotConfig:
     y_sources: list[str] = field(default_factory=list)
     title: str = ""
     y_label: str = ""
+    axis_limits: dict | None = None  # {"x": (min, max), "y": (min, max)}
     reference_curves: list[ReferenceCurve] = field(default_factory=list)
 
 
@@ -82,7 +83,10 @@ class PlotWindow(Window):
         self._rename_target = None  # PlotConfig being renamed
         self._rename_buf = ""
         # Per-plot saved axis limits: {plot_index: {"x": (min, max), "y": (min, max)}}
-        self._axis_limits: dict[int, dict] = {}
+        self._axis_limits: dict[int, dict] = {
+            i: p.axis_limits for i, p in enumerate(config.plots)
+            if p.axis_limits is not None
+        }
 
     def on_render(self):
         if not hasattr(self._extension, 'registry') or not hasattr(self._extension, 'task'):
