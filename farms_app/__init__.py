@@ -1,5 +1,6 @@
 """ FARMS app"""
 
+from importlib import metadata
 
 # Main version
-__version__ = "0.1.11"
+__version__: str = metadata.version("farms_app")
