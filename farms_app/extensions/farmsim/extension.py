@@ -17,6 +17,7 @@ from farms_app.plots.data_registry import DataRegistry
 from farms_app.plots.plot_window import (PlotConfig, PlotWindow,
                                          PlotWindowConfig)
 from farms_core import pylog
+from farms_core.sensors.data import SensorsData
 from farms_core.experiment.options import ExperimentOptions
 from farms_core.simulation.options import Simulator
 from farms_sim.simulation import simulation_setup
@@ -54,6 +55,15 @@ class FARMSIMExtension(Extension):
         self.toolbar.on_step_back_many = lambda: self._step(-10)
         self.toolbar.on_speed_change = self._set_speed
         self.toolbar.on_scrub = self._scrub
+        self.toolbar.on_record = self._toggle_record
+
+        # Recording
+        self._recording = False
+        self._record_data = None      # AnimatData for recording
+        self._record_index = 0
+        self._record_duration = 1000  # iterations
+        self._record_path = ""
+        self._show_record_popup = False
 
         # Windows
         self._mujoco_win = MuJoCoViewportWindow(self)
@@ -141,6 +151,85 @@ class FARMSIMExtension(Extension):
         max_back = -min(task.iteration, task.buffer_size)
         self._view_offset = max(max_back, min(0, int(offset)))
 
+    def _toggle_record(self):
+        """Toggle recording. Opens config popup or stops active recording."""
+        if self.sim is None:
+            return
+        if self._recording:
+            self._stop_recording()
+        else:
+            # Default save path next to experiment file
+            if not self._record_path:
+                exp_dir = os.path.dirname(getattr(self, '_experiment_path', '') or '')
+                self._record_path = os.path.join(exp_dir, "recording.hdf5") if exp_dir else "recording.hdf5"
+            self._show_record_popup = True
+
+    def _start_recording(self):
+        """Create recording AnimatData (with network log if available), start capturing."""
+        from farms_core.model.data import AnimatData
+        sensors = self.farms_data.sensors
+        network_log = None
+        network = self.network
+        if network is not None:
+            from farms_network.core.data import NetworkLog
+            opts = network.options
+            orig_buf = opts.logs.buffer_size
+            opts.logs.buffer_size = self._record_duration
+            network_log = NetworkLog.from_options(opts)
+            opts.logs.buffer_size = orig_buf
+        self._record_data = AnimatData(
+            sensors=SensorsData.from_names(
+                buffer_size=self._record_duration,
+                links_names=sensors.links.names,
+                joints_names=sensors.joints.names,
+                contacts_names=sensors.contacts.names,
+                xfrc_names=sensors.xfrc.names,
+                muscles_names=sensors.muscles.names,
+                adhesions_names=sensors.adhesions.names,
+                visuals_names=sensors.visuals.names,
+            ),
+            network=network_log,
+        )
+        self._record_index = 0
+        self._recording = True
+
+    def _stop_recording(self):
+        """Stop recording and save to file."""
+        self._recording = False
+        if self._record_data is not None:
+            self._record_data.to_file(self._record_path, iteration=self._record_index)
+            pylog.info("Recording saved to %s (%d iterations)", self._record_path, self._record_index)
+            self._record_data = None
+
+    def _record_step(self):
+        """Copy current iteration's sensor and network data into the recording buffer."""
+        if not self._recording:
+            return
+        sim_idx = self.task.iteration % self.task.buffer_size
+        rec_idx = self._record_index
+
+        # Sensors
+        sim_sensors = self.farms_data.sensors
+        rec_sensors = self._record_data.sensors
+        for attr in ('links', 'joints', 'contacts', 'xfrc', 'muscles', 'adhesions', 'visuals'):
+            src = getattr(sim_sensors, attr, None)
+            dst = getattr(rec_sensors, attr, None)
+            if src is not None and dst is not None:
+                dst.array[rec_idx] = src.array[sim_idx]
+
+        # Network
+        if self._record_data.network is not None:
+            sim_log = self.network.log
+            rec_log = self._record_data.network
+            net_idx = self.task.iteration % sim_log.outputs.array.shape[0]
+            rec_log.states.array[rec_idx] = sim_log.states.array[net_idx]
+            rec_log.outputs.array[rec_idx] = sim_log.outputs.array[net_idx]
+            rec_log.external_inputs.array[rec_idx] = sim_log.external_inputs.array[net_idx]
+
+        self._record_index += 1
+        if self._record_index >= self._record_duration:
+            self._stop_recording()
+
     def _step(self, n):
         """Step the simulation by n iterations. Positive = forward, negative = rewind view."""
         if self.sim is None:
@@ -165,6 +254,7 @@ class FARMSIMExtension(Extension):
                     self.hooks["pre_substep"].fire(self, task.iteration, self.sim.physics)
                     self.sim._env.step(action=None)
                     self.hooks["post_substep"].fire(self, task.iteration, self.sim.physics)
+                self._record_step()
         else:
             # Rewind view index (no physics rewind)
             new_iter = max(0, task.iteration + n)
@@ -216,6 +306,37 @@ class FARMSIMExtension(Extension):
                 imgui.close_current_popup()
             if imgui.is_key_pressed(imgui.Key.escape):
                 imgui.close_current_popup()
+            imgui.end_popup()
+
+        # Record popup
+        if self._show_record_popup:
+            imgui.open_popup("##record_config")
+            self._show_record_popup = False
+        if imgui.begin_popup("##record_config"):
+            imgui.text("Record Configuration")
+            imgui.separator()
+
+            changed, val = imgui.input_int("Duration (iterations)", self._record_duration, step=100)
+            if changed:
+                self._record_duration = max(1, val)
+
+            imgui.text(f"Save to: {self._record_path}")
+            imgui.same_line()
+            if imgui.small_button("Browse"):
+                result = pfd.save_file(
+                    "Save recording", self._record_path, ["*.hdf5"],
+                ).result()
+                if result:
+                    self._record_path = result
+
+            imgui.spacing()
+            if imgui.button("Start Recording"):
+                self._start_recording()
+                imgui.close_current_popup()
+            imgui.same_line()
+            if imgui.button("Cancel"):
+                imgui.close_current_popup()
+
             imgui.end_popup()
 
     # Experiment loading
@@ -314,6 +435,7 @@ class FARMSIMExtension(Extension):
                 self.hooks["pre_substep"].fire(self, task.iteration, self.sim.physics)
                 self.sim._env.step(action=None)
                 self.hooks["post_substep"].fire(self, task.iteration, self.sim.physics)
+            self._record_step()
 
     # Input & lifecycle
     def on_event(self):

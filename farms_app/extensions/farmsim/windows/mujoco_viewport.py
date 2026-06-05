@@ -73,6 +73,7 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
         ext.toolbar.render(
             playback_state=ext.playback_state,
             speed=ext.playback_speed,
+            recording=ext._recording,
             scrub_value=ext._view_offset,
             scrub_min=scrub_min,
             scrub_max=scrub_max,

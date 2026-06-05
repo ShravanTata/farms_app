@@ -100,6 +100,7 @@ class SimulationToolbar:
         current_time:   Optional[float] = None,
         total_time:     Optional[float] = None,
         speed:          float = 1.0,
+        recording:      bool = False,
         scrub_value:    float = 0.0,
         scrub_min:      float = 0.0,
         scrub_max:      float = 0.0,
@@ -111,9 +112,9 @@ class SimulationToolbar:
         """
         is_playing   = playback_state == PlaybackState.PLAYING
         is_paused    = playback_state == PlaybackState.PAUSED
-        is_recording = playback_state == PlaybackState.RECORDING
+        is_recording = recording
         is_stopped   = playback_state == PlaybackState.STOPPED
-        is_active    = is_playing or is_recording
+        is_active    = is_playing
 
         style = imgui.get_style()
         btn_size = em_to_vec2(2, 1.6)
