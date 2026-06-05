@@ -205,7 +205,9 @@ class FARMSIMExtension(Extension):
         """Copy current iteration's sensor and network data into the recording buffer."""
         if not self._recording:
             return
-        sim_idx = self.task.iteration % self.task.buffer_size
+        # task.iteration was already incremented by task.after_step(),
+        # so read from the previous index to match what was just simulated.
+        sim_idx = (self.task.iteration - 1) % self.task.buffer_size
         rec_idx = self._record_index
 
         # Sensors
@@ -221,7 +223,7 @@ class FARMSIMExtension(Extension):
         if self._record_data.network is not None:
             sim_log = self.network.log
             rec_log = self._record_data.network
-            net_idx = self.task.iteration % sim_log.outputs.array.shape[0]
+            net_idx = (self.task.iteration - 1) % sim_log.outputs.array.shape[0]
             rec_log.states.array[rec_idx] = sim_log.states.array[net_idx]
             rec_log.outputs.array[rec_idx] = sim_log.outputs.array[net_idx]
             rec_log.external_inputs.array[rec_idx] = sim_log.external_inputs.array[net_idx]
