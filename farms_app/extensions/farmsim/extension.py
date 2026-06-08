@@ -59,7 +59,7 @@ class FARMSIMExtension(Extension):
 
         # Recording
         self._recording = False
-        self._record_data = None      # AnimatData for recording
+        self._record_data = None      # ExperimentData for recording
         self._record_index = 0
         self._record_duration = 1000  # iterations
         self._record_path = ""
@@ -165,8 +165,11 @@ class FARMSIMExtension(Extension):
             self._show_record_popup = True
 
     def _start_recording(self):
-        """Create recording AnimatData (with network log if available), start capturing."""
+        """Create recording ExperimentData (with network log if available), start capturing."""
+        import numpy as np
         from farms_core.model.data import AnimatData
+        from farms_core.simulation.data import SimulationData
+        from farms_core.experiment.data import ExperimentData
         sensors = self.farms_data.sensors
         network_log = None
         network = self.network
@@ -177,18 +180,24 @@ class FARMSIMExtension(Extension):
             opts.logs.buffer_size = self._record_duration
             network_log = NetworkLog.from_options(opts)
             opts.logs.buffer_size = orig_buf
-        self._record_data = AnimatData(
-            sensors=SensorsData.from_names(
-                buffer_size=self._record_duration,
-                links_names=sensors.links.names,
-                joints_names=sensors.joints.names,
-                contacts_names=sensors.contacts.names,
-                xfrc_names=sensors.xfrc.names,
-                muscles_names=sensors.muscles.names,
-                adhesions_names=sensors.adhesions.names,
-                visuals_names=sensors.visuals.names,
-            ),
-            network=network_log,
+        timestep = self.task.timestep
+        self._record_data = ExperimentData(
+            times=np.arange(self._record_duration) * timestep,
+            timestep=timestep,
+            simulation=SimulationData.from_size(self._record_duration),
+            animats=[AnimatData(
+                sensors=SensorsData.from_names(
+                    buffer_size=self._record_duration,
+                    links_names=sensors.links.names,
+                    joints_names=sensors.joints.names,
+                    contacts_names=sensors.contacts.names,
+                    xfrc_names=sensors.xfrc.names,
+                    muscles_names=sensors.muscles.names,
+                    adhesions_names=sensors.adhesions.names,
+                    visuals_names=sensors.visuals.names,
+                ),
+                network=network_log,
+            )],
         )
         self._record_index = 0
         self._recording = True
@@ -212,7 +221,7 @@ class FARMSIMExtension(Extension):
 
         # Sensors
         sim_sensors = self.farms_data.sensors
-        rec_sensors = self._record_data.sensors
+        rec_sensors = self._record_data.animats[0].sensors
         for attr in ('links', 'joints', 'contacts', 'xfrc', 'muscles', 'adhesions', 'visuals'):
             src = getattr(sim_sensors, attr, None)
             dst = getattr(rec_sensors, attr, None)
@@ -220,9 +229,9 @@ class FARMSIMExtension(Extension):
                 dst.array[rec_idx] = src.array[sim_idx]
 
         # Network
-        if self._record_data.network is not None:
+        if self._record_data.animats[0].network is not None:
             sim_log = self.network.log
-            rec_log = self._record_data.network
+            rec_log = self._record_data.animats[0].network
             net_idx = (self.task.iteration - 1) % sim_log.outputs.array.shape[0]
             rec_log.states.array[rec_idx] = sim_log.states.array[net_idx]
             rec_log.outputs.array[rec_idx] = sim_log.outputs.array[net_idx]
