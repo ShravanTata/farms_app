@@ -139,6 +139,7 @@ class ExtensionManager:
                     ft.end_phase("render")
                     ft.end_scope()
             except Exception as e:
+                console.print_exception()
                 pylog.error(f"Error in extension {name}: {e}")
 
     def save_state(self) -> dict:

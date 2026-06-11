@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from farms_app.core.window import Window
-from imgui_bundle import imgui, implot
+from imgui_bundle import imgui, implot, portable_file_dialogs as pfd
 
 if TYPE_CHECKING:
     from farms_app.extensions.farmsim.extension import FARMSIMExtension
@@ -69,11 +69,15 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
     """Interactive network topology diagram with live activation coloring."""
 
     def __init__(self, extension):
-        super().__init__("Network Visualizer", extension)
+        super().__init__(
+            "Network Visualizer", extension,
+            window_flags=imgui.WindowFlags_.menu_bar,
+        )
         self._edges_p1p2 = []
         self._edge_weights = []
         self._network_ready = False
         self._needs_fit = False
+        self._show_names = True
 
     @property
     def network(self):
@@ -103,7 +107,31 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         self._network_ready = True
         self._needs_fit = True
 
+    def _export_tikz(self):
+        result = pfd.save_file("Export TikZ", "network.tex", ["*.tex"]).result()
+        if result:
+            from farms_app.extensions.farmsim.network_export import export_tikz
+            export_tikz(self.network, result)
+
+    def _export_matplotlib(self):
+        result = pfd.save_file("Export Figure", "network.png", ["*.png", "*.pdf", "*.svg"]).result()
+        if result:
+            from farms_app.extensions.farmsim.network_export import export_matplotlib
+            export_matplotlib(self.network, result)
+
     def on_render(self):
+        if imgui.begin_menu_bar():
+            if imgui.begin_menu("View"):
+                _, self._show_names = imgui.menu_item("Show names", "", self._show_names)
+                imgui.end_menu()
+            if imgui.begin_menu("Export", enabled=self.network is not None):
+                if imgui.menu_item_simple("TikZ (.tex)"):
+                    self._export_tikz()
+                if imgui.menu_item_simple("Figure (.png)"):
+                    self._export_matplotlib()
+                imgui.end_menu()
+            imgui.end_menu_bar()
+
         if self.network is None:
             self._network_ready = False
             imgui.text("No network loaded")
@@ -163,9 +191,10 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
                 node_positions.append(pos)
 
             # Labels (separate pass so we can skip overlaps)
-            implot.push_plot_clip_rect()
-            self._draw_labels(draw_list, nodes, node_positions)
-            implot.pop_plot_clip_rect()
+            if self._show_names:
+                implot.push_plot_clip_rect()
+                self._draw_labels(draw_list, nodes, node_positions)
+                implot.pop_plot_clip_rect()
 
             implot.end_plot()
 
