@@ -27,6 +27,9 @@ LAYOUT_TYPES = ["subplots_vertical", "tabs"]
 # Special x-source values (not registry keys)
 X_STATIC = ["time", "index"]
 
+PLOT_TYPES = ["line", "scatter", "stairs"]
+MARKER_NAMES = ["none", "circle", "square", "diamond", "cross", "plus", "up", "down"]
+
 
 # Configuration
 @dataclass
@@ -40,6 +43,17 @@ class ReferenceCurve:
     y: np.ndarray               # precomputed y values
     label: str = ""             # legend label
     color: tuple = ()           # (r, g, b, a) — empty for auto
+
+
+@dataclass
+class SignalStyle:
+    """Visual style for a single signal trace."""
+    plot_type: str = "line"       # "line", "scatter", "stairs"
+    thickness: float = 1.0
+    marker: str = "none"          # "none", "circle", "square", etc.
+    marker_size: float = 4.0
+    fill: bool = False
+    fill_alpha: float = 0.25
 
 
 @dataclass
@@ -58,6 +72,7 @@ class PlotConfig:
     y_label: str = ""
     axis_limits: dict | None = None  # {"x": (min, max), "y": (min, max)}
     reference_curves: list[ReferenceCurve] = field(default_factory=list)
+    signal_styles: dict[str, SignalStyle] = field(default_factory=dict)
 
 
 @dataclass
@@ -157,6 +172,15 @@ class PlotWindow(Window):
                             to_remove = j
                     if to_remove is not None:
                         plot_cfg.y_sources.pop(to_remove)
+                    imgui.end_menu()
+
+                # Signal styles
+                if plot_cfg.y_sources and imgui.begin_menu("Signal Style"):
+                    for source_name in plot_cfg.y_sources:
+                        label = "/".join(source_name.split("/")[-2:])
+                        if imgui.begin_menu(f"{label}##style_{i}_{source_name}"):
+                            self._render_signal_style_controls(plot_cfg, source_name)
+                            imgui.end_menu()
                     imgui.end_menu()
 
                 imgui.separator()
@@ -320,6 +344,59 @@ class PlotWindow(Window):
                         imgui.end_menu()
                 imgui.end_menu()
 
+    # Signal style controls
+    def _render_signal_style_controls(self, plot_cfg, source_name):
+        """Inline style controls for a signal inside a menu."""
+        style = plot_cfg.signal_styles.get(source_name)
+        if style is None:
+            style = SignalStyle()
+            plot_cfg.signal_styles[source_name] = style
+
+        # Plot type
+        if imgui.begin_menu("Type"):
+            for pt in PLOT_TYPES:
+                if imgui.menu_item(pt, "", style.plot_type == pt)[0]:
+                    style.plot_type = pt
+            imgui.end_menu()
+
+        # Thickness
+        imgui.set_next_item_width(120)
+        changed, val = imgui.slider_float(
+            f"Thickness##{source_name}", style.thickness, 0.5, 5.0,
+        )
+        if changed:
+            style.thickness = val
+
+        # Marker
+        if imgui.begin_menu("Marker"):
+            for mk in MARKER_NAMES:
+                if imgui.menu_item(mk, "", style.marker == mk)[0]:
+                    style.marker = mk
+            imgui.end_menu()
+
+        if style.marker != "none":
+            imgui.set_next_item_width(120)
+            changed, val = imgui.slider_float(
+                f"Marker Size##{source_name}", style.marker_size, 1.0, 10.0,
+            )
+            if changed:
+                style.marker_size = val
+
+        imgui.separator()
+
+        # Fill
+        changed, val = imgui.checkbox(f"Fill##{source_name}", style.fill)
+        if changed:
+            style.fill = val
+
+        if style.fill:
+            imgui.set_next_item_width(120)
+            changed, val = imgui.slider_float(
+                f"Fill Alpha##{source_name}", style.fill_alpha, 0.05, 1.0,
+            )
+            if changed:
+                style.fill_alpha = val
+
     # Plot rendering
     _MIN_SUBPLOT_HEIGHT = 120
     _REF_ALPHA = 0.4
@@ -480,26 +557,63 @@ class PlotWindow(Window):
 
                 y_data = np.ascontiguousarray(source.accessor())
                 label = "/".join(source_name.split("/")[-2:])
+                style = plot_cfg.signal_styles.get(source_name)
+
+                # Build spec with style
+                spec = implot.Spec()
+                spec.offset = ring_offset
+                if style is not None:
+                    spec.line_weight = style.thickness
+                    if style.marker != "none":
+                        spec.marker = getattr(
+                            implot.Marker_, style.marker, implot.Marker_.none,
+                        )
+                        spec.marker_size = style.marker_size
+
+                plot_fn = implot.plot_line
+                if style is not None:
+                    plot_fn = {
+                        "scatter": implot.plot_scatter,
+                        "stairs": implot.plot_stairs,
+                    }.get(style.plot_type, implot.plot_line)
 
                 if is_time:
-                    # Single-array overload with xscale/xstart, ring buffer offset
                     xscale = 1.0 / buf_size
                     xstart = -1.0
-                    spec = implot.Spec()
-                    spec.offset = ring_offset
-                    implot.plot_line(label, y_data, xscale, xstart, spec)
+                    plot_fn(label, y_data, xscale, xstart, spec)
+                    if style is not None and style.fill:
+                        color = implot.get_last_item_color()
+                        fill_spec = implot.Spec()
+                        fill_spec.offset = ring_offset
+                        fill_spec.fill_color = color
+                        fill_spec.fill_alpha = style.fill_alpha
+                        implot.plot_shaded(
+                            f"##{label}_fill", y_data, 0.0, xscale, xstart, fill_spec,
+                        )
 
                 elif is_index:
-                    # Plot against array indices with ring buffer offset
-                    spec = implot.Spec()
-                    spec.offset = ring_offset
-                    implot.plot_line(label, y_data, 1.0, 0.0, spec)
+                    plot_fn(label, y_data, 1.0, 0.0, spec)
+                    if style is not None and style.fill:
+                        color = implot.get_last_item_color()
+                        fill_spec = implot.Spec()
+                        fill_spec.offset = ring_offset
+                        fill_spec.fill_color = color
+                        fill_spec.fill_alpha = style.fill_alpha
+                        implot.plot_shaded(
+                            f"##{label}_fill", y_data, 0.0, 1.0, 0.0, fill_spec,
+                        )
 
                 elif x_data is not None:
-                    # XY: live data with ring buffer offset
-                    spec = implot.Spec()
-                    spec.offset = ring_offset
-                    implot.plot_line(f"{label}##line", x_data, y_data, spec)
+                    plot_fn(f"{label}##line", x_data, y_data, spec)
+                    if style is not None and style.fill:
+                        color = implot.get_last_item_color()
+                        fill_spec = implot.Spec()
+                        fill_spec.offset = ring_offset
+                        fill_spec.fill_color = color
+                        fill_spec.fill_alpha = style.fill_alpha
+                        implot.plot_shaded(
+                            f"##{label}_fill", x_data, y_data, 0.0, fill_spec,
+                        )
 
                     # Current position marker
                     cur_idx = (ring_offset - 1) % buf_size

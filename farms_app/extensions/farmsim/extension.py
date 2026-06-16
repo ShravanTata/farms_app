@@ -15,7 +15,7 @@ from farms_app.extensions.farmsim.windows.network_visualizer import \
 from farms_app.extensions.farmsim.windows.properties import PropertiesWindow
 from farms_app.plots.data_registry import DataRegistry
 from farms_app.plots.plot_window import (PlotConfig, PlotWindow,
-                                         PlotWindowConfig)
+                                         PlotWindowConfig, SignalStyle)
 from farms_core import pylog
 from farms_core.sensors.data import SensorsData
 from farms_core.experiment.options import ExperimentOptions
@@ -497,6 +497,17 @@ class FARMSIMExtension(Extension):
                             "x": list(window._axis_limits[i]["x"]),
                             "y": list(window._axis_limits[i]["y"]),
                         } if i in window._axis_limits else None,
+                        "signal_styles": {
+                            name: {
+                                "plot_type": s.plot_type,
+                                "thickness": s.thickness,
+                                "marker": s.marker,
+                                "marker_size": s.marker_size,
+                                "fill": s.fill,
+                                "fill_alpha": s.fill_alpha,
+                            }
+                            for name, s in p.signal_styles.items()
+                        } if p.signal_styles else None,
                     }
                     for i, p in enumerate(cfg.plots)
                 ],
@@ -558,6 +569,10 @@ class FARMSIMExtension(Extension):
                         "x": tuple(al["x"]),
                         "y": tuple(al["y"]),
                     } if (al := p.get("axis_limits")) is not None else None,
+                    signal_styles={
+                        name: SignalStyle(**s)
+                        for name, s in ss.items()
+                    } if (ss := p.get("signal_styles")) else {},
                 )
                 for p in cfg_dict.get("plots", [])
             ]
