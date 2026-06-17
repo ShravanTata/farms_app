@@ -400,6 +400,8 @@ class PlotWindow(Window):
     # Plot rendering
     _MIN_SUBPLOT_HEIGHT = 120
     _REF_ALPHA = 0.4
+    _PHASE_ARROW_COUNT = 8
+    _PHASE_ARROW_SIZE = 8.0  # pixels
 
     def _render_reference_curves(self, plot_cfg: PlotConfig):
         """Draw static reference curves as dimmed background lines."""
@@ -414,6 +416,42 @@ class PlotWindow(Window):
             y = np.ascontiguousarray(ref.y, dtype=np.float64)
             label = ref.label if ref.label else f"##ref_{id(ref)}"
             implot.plot_line(label, x, y, spec)
+
+    def _render_phase_arrows(self, x_data, y_data, ring_offset, buf_size, color):
+        """Draw small directional arrows along the phase trajectory.
+
+        Must be called inside begin_plot/end_plot.
+        """
+        dl = implot.get_plot_draw_list()
+        col = imgui.get_color_u32(color)
+        sz = self._PHASE_ARROW_SIZE
+        step = max(1, buf_size // self._PHASE_ARROW_COUNT)
+
+        for k in range(0, buf_size - 1, step):
+            i0 = (ring_offset + k) % buf_size
+            i1 = (ring_offset + k + 1) % buf_size
+
+            p0 = implot.plot_to_pixels(float(x_data[i0]), float(y_data[i0]))
+            p1 = implot.plot_to_pixels(float(x_data[i1]), float(y_data[i1]))
+
+            dx = p1.x - p0.x
+            dy = p1.y - p0.y
+            length = (dx * dx + dy * dy) ** 0.5
+            if length < 1.0:
+                continue
+
+            dx /= length
+            dy /= length
+
+            # Place arrowhead at midpoint of the segment
+            mx = (p0.x + p1.x) * 0.5
+            my = (p0.y + p1.y) * 0.5
+
+            tip = imgui.ImVec2(mx + dx * sz,          my + dy * sz)
+            bl  = imgui.ImVec2(mx - dy * sz * 0.5,    my + dx * sz * 0.5)
+            br  = imgui.ImVec2(mx + dy * sz * 0.5,    my - dx * sz * 0.5)
+
+            dl.add_triangle_filled(tip, bl, br, col)
 
     def _push_plot_style(self):
         """Push shared aesthetic overrides for all plots."""
@@ -605,15 +643,17 @@ class PlotWindow(Window):
 
                 elif x_data is not None:
                     plot_fn(f"{label}##line", x_data, y_data, spec)
+                    line_color = implot.get_last_item_color()
                     if style is not None and style.fill:
-                        color = implot.get_last_item_color()
                         fill_spec = implot.Spec()
-                        fill_spec.offset = ring_offset
-                        fill_spec.fill_color = color
+                        fill_spec.fill_color = line_color
                         fill_spec.fill_alpha = style.fill_alpha
                         implot.plot_shaded(
                             f"##{label}_fill", x_data, y_data, 0.0, fill_spec,
                         )
+
+                    # Phase portrait direction arrows
+                    self._render_phase_arrows(x_data, y_data, ring_offset, buf_size, line_color)
 
                     # Current position marker
                     cur_idx = (ring_offset - 1) % buf_size
