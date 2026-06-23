@@ -1,6 +1,7 @@
 """ Main FARMSIM extension """
 
 import os
+import sys
 import time
 
 from farms_app.console import console
@@ -367,6 +368,7 @@ class FARMSIMExtension(Extension):
 
             original_cwd = os.getcwd()
             os.chdir(os.path.dirname(path))
+            sys.path.append(original_cwd)
             exp = ExperimentOptions.load(path)
             # TODO: This should be added to physics options
             exp.animats[0].mujoco = {
