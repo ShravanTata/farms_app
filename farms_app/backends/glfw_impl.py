@@ -45,6 +45,7 @@ class GLFWBackend(BaseBackend):
         self.window = None
         self.glsl_version = None
         self._initialized = False
+        self._screenshot_path: str | None = None
 
     def _determine_gl_version(self) -> Tuple[int, int, str]:
         """Determine best OpenGL version for platform"""
@@ -201,6 +202,38 @@ class GLFWBackend(BaseBackend):
         imgui.backends.glfw_new_frame()
         imgui.new_frame()
 
+    def _do_screenshot(self, path: str):
+        """Read the current framebuffer and save it as a PNG file.
+
+        Uses only stdlib (struct + zlib) — no PIL dependency required.
+        Must be called after imgui render draw data and before swap_buffers.
+        """
+        import struct
+        import zlib
+        import numpy as np
+
+        w, h = glfw.get_framebuffer_size(self.window)
+        GL.glPixelStorei(GL.GL_PACK_ALIGNMENT, 1)
+        pixels = GL.glReadPixels(0, 0, w, h, GL.GL_RGB, GL.GL_UNSIGNED_BYTE)
+
+        # OpenGL origin is bottom-left; flip to top-left for PNG
+        arr = np.frombuffer(pixels, dtype=np.uint8).reshape(h, w, 3)
+        arr = np.flipud(arr)
+
+        def _chunk(tag: bytes, data: bytes) -> bytes:
+            body = tag + data
+            return struct.pack('>I', len(data)) + body + struct.pack('>I', zlib.crc32(body) & 0xFFFFFFFF)
+
+        raw = b''.join(b'\x00' + row.tobytes() for row in arr)
+
+        with open(path, 'wb') as f:
+            f.write(b'\x89PNG\r\n\x1a\n')
+            f.write(_chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)))
+            f.write(_chunk(b'IDAT', zlib.compress(raw, 6)))
+            f.write(_chunk(b'IEND', b''))
+
+        pylog.info(f"Screenshot saved: {path}")
+
     def end_frame(self):
         """End frame rendering"""
         io = imgui.get_io()
@@ -212,6 +245,11 @@ class GLFWBackend(BaseBackend):
             imgui.backends.opengl3_render_draw_data(imgui.get_draw_data())
         else:
             imgui.backends.opengl2_render_draw_data(imgui.get_draw_data())
+
+        # Screenshot: read pixels after render, before swap so the buffer is complete
+        if self._screenshot_path:
+            self._do_screenshot(self._screenshot_path)
+            self._screenshot_path = None
 
         # Multi-viewport support
         if platform.system() != "Linux":

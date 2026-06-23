@@ -16,6 +16,7 @@ class BaseBackend(ABC):
 
     platform_name: str = "Unknown"
     renderer_name: str = "Unknown"
+    _screenshot_path: "str | None" = None
 
     @abstractmethod
     def initialize(self, name: str, width: int, height: int, **kwargs) -> Any:
@@ -56,6 +57,9 @@ class BaseBackend(ABC):
     @abstractmethod
     def event_timeout(self, timeout_seconds):
         """ Event timeout """
+
+    def _do_screenshot(self, path: str):
+        """Save the current framebuffer to path. Override in backends that support pixel readback."""
 
 
 class BaseRendererBackend(ABC):

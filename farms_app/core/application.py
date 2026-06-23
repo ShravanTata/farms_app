@@ -57,6 +57,9 @@ class FARMSApplication:
         self._quit_confirmed = False
         self._save_on_quit = True
 
+        # Screenshot: path set by menu after pfd dialog, forwarded to backend next frame
+        self._screenshot_path: str | None = None
+
         # Frame timer
         self.frame_timer = FrameTimer()
         self.extension_manager.frame_timer = self.frame_timer
@@ -133,6 +136,12 @@ class FARMSApplication:
 
                 # Poll events
                 self.backend.poll_events()
+
+                # Deferred screenshot: arm backend one frame after request so
+                # the menu UI is closed before the pixels are read
+                if self._screenshot_path:
+                    self.backend._screenshot_path = self._screenshot_path
+                    self._screenshot_path = None
 
                 # Start the Dear ImGui frame
                 self.backend.begin_frame()

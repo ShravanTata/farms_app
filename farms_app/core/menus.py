@@ -1,11 +1,12 @@
 """ Main application level menus """
 
+import datetime
 import sys
 from importlib.metadata import version
 
 import farms_app
 from farms_core import pylog
-from imgui_bundle import imgui
+from imgui_bundle import imgui, portable_file_dialogs as pfd
 
 
 _ABOUT_ROWS = (
@@ -42,6 +43,11 @@ def render_main_menu(app):
 
     # File
     if imgui.begin_menu("File"):
+        if imgui.menu_item_simple("Screenshot"):
+            default = datetime.datetime.now().strftime("screenshot_%Y%m%d_%H%M%S.png")
+            result = pfd.save_file("Save screenshot", default, ["*.png"]).result()
+            if result:
+                app._screenshot_path = result
         if imgui.menu_item_simple("Restore Defaults"):
             app.extension_manager.reset_all_state()
         imgui.separator()
