@@ -20,6 +20,7 @@ dependencies = [
     "rich",
     "h5py",
     "stevedore",
+    "farms_core", # Needed for logging
 ]
 
 classifiers = [
@@ -42,7 +43,6 @@ Changelog = "https://github.com/farmsim/farms_app/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 farms = [
-    "farms_core",
     "farms_sim",
     "farms_mujoco",
     "farms_network",
@@ -66,7 +66,7 @@ farms_app = [
 status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
 debug = "farms_app.extensions.ui.logger:DebugExtension"
 farmsim = "farms_app.extensions.farmsim.extension:FARMSIMExtension"
-# pendulum = "farms_app.extensions.custom.pendulum:PendulumExtension"
+
 # mujoco = "farms_app.extensions.custom.mujoco_impl:MuJoCoExtension"
 # experimental = "farms_app.extensions.custom.experimental:ExperimentalExtension"
 # network = "farms_app.extensions.custom.network:NetworkExtension"
