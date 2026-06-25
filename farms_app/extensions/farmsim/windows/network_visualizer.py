@@ -78,6 +78,7 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         self._network_ready = False
         self._needs_fit = False
         self._show_names = True
+        self._tikz_neuron_shading = "ball"
 
     @property
     def network(self):
@@ -111,7 +112,7 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
         result = pfd.save_file("Export TikZ", "network.tex", ["*.tex"]).result()
         if result:
             from farms_app.extensions.farmsim.network_export import export_tikz
-            export_tikz(self.network, result)
+            export_tikz(self.network, result, neuron_shading=self._tikz_neuron_shading)
 
     def _export_matplotlib(self):
         result = pfd.save_file("Export Figure", "network.png", ["*.png", "*.pdf", "*.svg"]).result()
@@ -127,6 +128,11 @@ class NetworkVisualizerWindow(Window["FARMSIMExtension"]):
             if imgui.begin_menu("Export", enabled=self.network is not None):
                 if imgui.menu_item_simple("TikZ (.tex)"):
                     self._export_tikz()
+                if imgui.begin_menu("Neuron Shading"):
+                    for shade in ("ball", "flat"):
+                        if imgui.menu_item(shade, "", self._tikz_neuron_shading == shade)[0]:
+                            self._tikz_neuron_shading = shade
+                    imgui.end_menu()
                 if imgui.menu_item_simple("Figure (.png)"):
                     self._export_matplotlib()
                 imgui.end_menu()
