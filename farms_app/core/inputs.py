@@ -48,8 +48,10 @@ class InputManager:
     def process(self):
         """Check and fire global shortcuts. Call once per frame before extension on_event()."""
         io = imgui.get_io()
-        # Don't process shortcuts when typing in an input field
+        # Don't process shortcuts when typing in an input field or when a modal is open
         if io.want_text_input:
+            return
+        if imgui.is_popup_open("", imgui.PopupFlags_.any_popup_id):
             return
 
         for shortcut in self._shortcuts:

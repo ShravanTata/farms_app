@@ -7,7 +7,8 @@ from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
 from farms_app.console import console
 from farms_app.core.extension import ExtensionManager
-from .fonts import load_fonts
+from farms_app.core.fonts import load_fonts
+from farms_app.core.inputs import InputManager
 from farms_app.core.profiler import FrameTimer
 from farms_core import pylog
 from imgui_bundle import imgui
@@ -55,6 +56,9 @@ class FARMSApplication:
 
         # Screenshot: path set by menu after pfd dialog, forwarded to backend next frame
         self._screenshot_path: str | None = None
+
+        # Input
+        self.input_manager: InputManager = InputManager()
 
         # Frame timer
         self.frame_timer = FrameTimer()
@@ -158,6 +162,9 @@ class FARMSApplication:
                         self.extension_manager.enable(ext_name)
                     _first = False
 
+                # Global shortcuts (suppressed when modal open or typing)
+                self.input_manager.process()
+
                 # Tick all extensions: update(dt) -> event() -> render()
                 self.frame_timer.begin_frame()
                 self.extension_manager.tick(dt)
@@ -206,19 +213,21 @@ class FARMSApplication:
         imgui.text("Save layout before quitting?")
         imgui.spacing()
 
-        if imgui.button("Save & Quit"):
+        confirm = imgui.button("(S)ave & Quit") or imgui.is_key_pressed(imgui.Key.enter) or imgui.is_key_pressed(imgui.Key.s)
+        if confirm:
             self._save_on_quit = True
             self._quit_confirmed = True
             imgui.close_current_popup()
             self.backend.request_close()
         imgui.same_line()
-        if imgui.button("Quit without saving"):
+        if imgui.button("(Q)uit without saving") or imgui.is_key_pressed(imgui.Key.q):
             self._save_on_quit = False
             self._quit_confirmed = True
             imgui.close_current_popup()
             self.backend.request_close()
         imgui.same_line()
-        if imgui.button("Cancel"):
+        cancel = imgui.button("(C)ancel") or imgui.is_key_pressed(imgui.Key.escape) or imgui.is_key_pressed(imgui.Key.c)
+        if cancel:
             self._quit_requested = False
             imgui.close_current_popup()
 
