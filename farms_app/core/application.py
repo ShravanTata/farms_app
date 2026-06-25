@@ -7,8 +7,8 @@ from farms_app.backends.glfw_impl import OpenGLVersion
 from farms_app.backends.manager import BackendManager
 from farms_app.console import console
 from farms_app.core.extension import ExtensionManager
+from .fonts import load_fonts
 from farms_app.core.profiler import FrameTimer
-from farms_app.utils import paths
 from farms_core import pylog
 from imgui_bundle import imgui
 
@@ -38,12 +38,8 @@ class FARMSApplication:
         self.enable_idling = options.enable_idling
         self.is_idling = False
 
-        # Fonts — load JetBrains Mono with FontAwesome icons merged in
-        from imgui_bundle import hello_imgui
-        font_path = str(paths.get_project_root().joinpath(
-            "farms_app", "assets", "fonts", options.fonts.name
-        ))
-        hello_imgui.load_font_ttf_with_font_awesome_icons(font_path, options.fonts.size)
+        # Fonts
+        load_fonts(options.fonts)
 
         # Setup extensions
         self.extension_manager = ExtensionManager()
