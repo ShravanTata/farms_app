@@ -2,7 +2,7 @@ name: Build and Publish to PyPI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 4-setup-main-architecture]
   pull_request:
     branches: [main]
   release:
@@ -39,6 +39,30 @@ jobs:
         with:
           name: sdist
           path: dist/*.tar.gz
+
+  publish_to_testpypi:
+    name: Publish to TestPyPI (dev branch)
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/4-setup-main-architecture' &&
+      contains(github.event.head_commit.message, '[VERSION]')
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/farms-app
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download all the dists
+        uses: actions/download-artifact@v6
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
 
   publish_to_pypi:
     name: >-
