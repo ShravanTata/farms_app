@@ -25,15 +25,13 @@ MJ_IMGUI_KEYMAP = {
 }
 
 # Geometry group toggle strings (matches MuJoCo's mjRNDSTRING/mjVISSTRING format)
+# Each entry: (name, enabled_str, key_char) — index j maps to option.geomgroup[j]
 MJ_GEOMSTRING = (
-    (
-        "Geom1", "1", "0",
-        "Geom2", "1", "1",
-        "Geom3", "1", "2",
-        "Geom4", "0", "3",
-        "Geom5", "0", "4",
-        "Geom6", "0", "5",
-    ),
+    ("Geom1", "1", "0"),
+    ("Geom2", "1", "1"),
+    ("Geom3", "1", "2"),
+    ("Geom4", "0", "3"),
+    ("Geom5", "0", "4"),
 )
 
 
