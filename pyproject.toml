@@ -46,7 +46,7 @@ farms = [
     "farms_sim",
     "farms_mujoco",
     "farms_network",
-    "farms_muscle",
+    # "farms_muscle",
 ]
 
 [project.scripts]
