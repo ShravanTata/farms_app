@@ -3,6 +3,7 @@
 Walks a FARMS simulation and populates a DataRegistry with all
 plottable signals from sensors and network.
 """
+from farms_core.model.control import AnimatController
 
 import numpy as np
 from farms_app.plots.data_registry import DataRegistry, DataSource
@@ -23,11 +24,13 @@ def build_registry(sim) -> DataRegistry:
     _register_contacts(registry, sensors.contacts)
 
     # Network (may not exist)
-    try:
-        network = sim.task.extensions[0].network
+    # Assuming 1 network 1 animat
+    for _ext in sim.task.extensions:
+        if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
+            network = _ext.network
         _register_network(registry, network)
-    except (IndexError, AttributeError):
-        pass
+        else:
+            pylog.debug("No animat neural network")
 
     pylog.info(f"Data registry: {len(registry.sources)} signals in {len(registry.groups)} groups")
     return registry

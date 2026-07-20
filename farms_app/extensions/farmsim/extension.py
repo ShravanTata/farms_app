@@ -1,4 +1,5 @@
 """ Main FARMSIM extension """
+from farms_core.model.control import AnimatController
 
 import os
 import sys
@@ -119,7 +120,10 @@ class FARMSIMExtension(Extension):
         if self.sim is None:
             return None
         try:
-            return self.sim.task.extensions[0].network
+            # Assuming 1 network 1 animat
+            for _ext in self.sim.task.extensions:
+                if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
+                    return _ext.network
         except (IndexError, AttributeError):
             return None
 
