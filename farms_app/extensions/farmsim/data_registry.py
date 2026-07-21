@@ -65,8 +65,7 @@ def _register_joints(registry, joints):
             ))
 
 
-# ── Links ────────────────────────────────────────────────────────────
-
+# Links
 _LINK_CHANNELS = [
     ("com_pos_x", sc.link_com_position_x, "m"),
     ("com_pos_y", sc.link_com_position_y, "m"),
@@ -93,8 +92,7 @@ def _register_links(registry, links):
             ))
 
 
-# ── Muscles ──────────────────────────────────────────────────────────
-
+# Muscles
 _MUSCLE_CHANNELS = [
     ("excitation",      sc.muscle_excitation,     ""),
     ("activation",      sc.muscle_activation,     ""),
@@ -128,8 +126,7 @@ def _register_muscles(registry, muscles):
             ))
 
 
-# ── Contacts ─────────────────────────────────────────────────────────
-
+# Contacts
 _CONTACT_CHANNELS = [
     ("reaction_x", sc.contact_reaction_x, "N"),
     ("reaction_y", sc.contact_reaction_y, "N"),
