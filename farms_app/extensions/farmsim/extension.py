@@ -27,6 +27,15 @@ from imgui_bundle import imgui
 from imgui_bundle import portable_file_dialogs as pfd
 
 
+try:
+    from farms_network.core.network import Network
+    __FARMS_NETWORK = True
+except ModuleNotFoundError:
+    __FARMS_NETWORK = False
+    pylog.debug("Farms network not installed ")
+
+
+
 class FARMSIMExtension(Extension):
 
     _PLOT_WINDOW_COUNTER = 0
@@ -119,12 +128,12 @@ class FARMSIMExtension(Extension):
         """Network from the first task extension, or None."""
         if self.sim is None:
             return None
-        try:
-            # Assuming 1 network 1 animat
+
             for _ext in self.sim.task.extensions:
                 if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
+                if isinstance(_ext.network, Network):
                     return _ext.network
-        except (IndexError, AttributeError):
+                else:
             return None
 
     # Playback controls
@@ -386,7 +395,7 @@ class FARMSIMExtension(Extension):
             self.sim = simulation_setup(experiment_options=exp,)
             self._experiment_path = path
             self._config_win.load_file(path)
-            self.registry = build_registry(self.sim)
+            self.registry = build_registry(self.sim, network=self.network)
             pylog.info(f"Loaded experiment: {path}")
 
             # Restore saved plot windows, or create defaults
