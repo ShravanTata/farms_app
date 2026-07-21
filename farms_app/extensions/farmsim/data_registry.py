@@ -28,7 +28,7 @@ def build_registry(sim) -> DataRegistry:
     for _ext in sim.task.extensions:
         if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
             network = _ext.network
-        _register_network(registry, network)
+            _register_network(registry, network)
         else:
             pylog.debug("No animat neural network")
 
