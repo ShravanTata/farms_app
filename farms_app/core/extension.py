@@ -121,6 +121,7 @@ class ExtensionManager:
         ft = self.frame_timer
         for name, enabled_ext in list(self._enabled_exts.items()):
             try:
+                enabled_ext.obj.dockspace_id = self.dockspace_id
                 if ft:
                     ft.begin_scope(name)
                     ft.begin_phase("update")
