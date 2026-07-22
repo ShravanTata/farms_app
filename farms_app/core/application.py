@@ -117,8 +117,15 @@ class FARMSApplication:
         """ Render menu """
         render_main_menu(self)
 
-    def run(self):
-        """main run method"""
+    def run(self, on_ready=None):
+        """Main run method.
+
+        Args:
+            on_ready: Optional callback ``f(app)`` invoked once on the first
+                      frame, after extensions are enabled and the dockspace
+                      is ready. Use this to register windows, connect hooks,
+                      and load data — the dockspace_id is guaranteed valid.
+        """
 
         _first = True
         _last_time = time.perf_counter()
@@ -161,6 +168,8 @@ class FARMSApplication:
                 if _first:
                     for ext_name in self._options.extension.auto_enable:
                         self.extension_manager.enable(ext_name)
+                    if on_ready:
+                        on_ready(self)
                     _first = False
 
                 # Global shortcuts (suppressed when modal open or typing)
