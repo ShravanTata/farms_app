@@ -85,21 +85,11 @@ class FARMSIMExtension(Extension):
         self.register_window(self._config_win)
         self._network_vis_win = NetworkVisualizerWindow(self)
         self.register_window(self._network_vis_win)
-        self._bottom_dock_id = 0
         self._new_plot_name = ""
         self._show_new_plot_popup = False
 
     def on_enable(self):
-        from farms_app.core import layout
-        if self.dockspace_id and layout.is_first_use():
-            ds = self.dockspace_id
-            left, rest = layout.split(ds, imgui.Dir.left, 0.2)
-            self._bottom_dock_id, center = layout.split(rest, imgui.Dir.down, 0.25)
-            layout.dock_window(self._config_win.window_id, left)
-            layout.dock_window(self._properties_win.window_id, left)
-            layout.dock_window(self._mujoco_win.window_id, center)
-            layout.dock_window(self._network_vis_win.window_id, center)
-            layout.finish(ds)
+        pass
 
     # Data accessors
     @property
@@ -311,8 +301,9 @@ class FARMSIMExtension(Extension):
                         window.toggle_visibility()
                 imgui.end_menu()
             imgui.separator()
-            if imgui.menu_item_simple("Reset Layout", enabled=self.sim is not None):
-                self.on_reset_state()
+            if imgui.menu_item_simple("Reset Layout"):
+                for w in self.windows.values():
+                    w._reset_dock_phase = 2
             imgui.end_menu()
 
         # New plot window name popup
@@ -428,9 +419,6 @@ class FARMSIMExtension(Extension):
         win = PlotWindow(self, PlotWindowConfig(name=name))
         self.register_window(win)
         win.initialize()
-        if self._bottom_dock_id:
-            from farms_app.core import layout
-            layout.dock_window(win.window_id, self._bottom_dock_id)
 
     # Simulation stepping
     def on_update(self, dt):
@@ -477,11 +465,11 @@ class FARMSIMExtension(Extension):
             self.sim = None
         # Remove dynamic windows (keep persistent windows like the viewport)
         to_remove = [
-            name for name, w in self.windows.items()
+            w for w in self.windows.values()
             if isinstance(w, PlotWindow)
         ]
-        for name in to_remove:
-            self.unregister_window(self.windows[name])
+        for w in to_remove:
+            self.unregister_window(w)
         self.registry = DataRegistry()
         self.playback_state = PlaybackState.STOPPED
         self._dt_remainder = 0.0
