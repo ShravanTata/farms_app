@@ -97,8 +97,9 @@ class Window(Generic[E]):
             self._reset_dock_phase = 0  # cancel pending reset
             return
 
-        # Layout docking: two-phase reset (undock → redock) because ImGui
-        # skips SetWindowDock when DockId already matches the target.
+        # Layout: _default_rect takes precedence over auto-docking.
+        # Windows with a rect float at their RectCut position;
+        # windows without one dock into the extension's dockspace.
         dock_id = self._extension.dockspace_id
         if self._reset_dock_phase == 2:
             imgui.set_next_window_dock_id(0, imgui.Cond_.always)
@@ -107,13 +108,12 @@ class Window(Generic[E]):
             if dock_id:
                 imgui.set_next_window_dock_id(dock_id, imgui.Cond_.always)
             self._reset_dock_phase = 0
-        elif dock_id and self._extension.auto_dock_windows:
-            imgui.set_next_window_dock_id(dock_id, imgui.Cond_.first_use_ever)
-
-        if self._default_rect:
+        elif self._default_rect:
             r = self._default_rect
             imgui.set_next_window_pos(imgui.ImVec2(r.minx, r.miny), imgui.Cond_.first_use_ever)
             imgui.set_next_window_size(imgui.ImVec2(r.width, r.height), imgui.Cond_.first_use_ever)
+        elif dock_id and self._extension.auto_dock_windows:
+            imgui.set_next_window_dock_id(dock_id, imgui.Cond_.first_use_ever)
         else:
         imgui.set_next_window_size(em_to_vec2(25, 19), imgui.Cond_.first_use_ever)
         expanded, self._visible = imgui.begin(
