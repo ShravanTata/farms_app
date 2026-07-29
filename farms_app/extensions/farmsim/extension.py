@@ -119,12 +119,12 @@ class FARMSIMExtension(Extension):
         if self.sim is None:
             return None
 
-            for _ext in self.sim.task.extensions:
-                if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
+        for _ext in self.sim.task.extensions:
+            if isinstance(_ext, AnimatController) and hasattr(_ext, 'network'):
                 if isinstance(_ext.network, Network):
                     return _ext.network
                 else:
-            return None
+                    return None
 
     # Playback controls
     def _play(self):

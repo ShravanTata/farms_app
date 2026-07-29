@@ -115,7 +115,7 @@ class Window(Generic[E]):
         elif dock_id and self._extension.auto_dock_windows:
             imgui.set_next_window_dock_id(dock_id, imgui.Cond_.first_use_ever)
         else:
-        imgui.set_next_window_size(em_to_vec2(25, 19), imgui.Cond_.first_use_ever)
+            imgui.set_next_window_size(em_to_vec2(25, 19), imgui.Cond_.first_use_ever)
         expanded, self._visible = imgui.begin(
             self._window_id,
             self._visible,
