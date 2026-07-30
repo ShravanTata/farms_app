@@ -5,6 +5,14 @@ import numpy as np
 from imgui_bundle import imgui
 
 
+# mjv_moveCamera dropped 'scene' in 3.11.0
+_move_camera = (
+    (lambda model, action, reldx, reldy, scene, camera: mujoco.mjv_moveCamera(model, action, reldx, reldy, camera))
+    if mujoco.mj_version() >= 3011000 else
+    (lambda model, action, reldx, reldy, scene, camera: mujoco.mjv_moveCamera(model, action, reldx, reldy, scene, camera))
+)
+
+
 # ImGui key mapping for MuJoCo toggle keys
 MJ_IMGUI_KEYMAP = {
     # special keys
@@ -120,37 +128,21 @@ def mouse_interactions(model, scene, camera, width, height):
     mouse_delta = io.mouse_delta
     mouse_wheel = io.mouse_wheel
 
-    if mujoco.mj_version() >= 3011000:
-        def _move_camera(model, action, reldx, reldy, scene, camera):
-            mujoco.mjv_moveCamera(
-                model, action, reldx, reldy, camera
-            )
-    else:
-        def _move_camera(model, action, reldx, reldy, scene, camera):
-            mujoco.mjv_moveCamera(
-                model, action, reldx, reldy, scene, camera
-            )
-
     if imgui.is_key_down(imgui.Key.mouse_left):
         _move_camera(
-            model, mujoco.mjtMouse.mjMOUSE_ROTATE_H,
-            -mouse_delta.x / width, 0.0, scene, camera
+            model, mujoco.mjtMouse.mjMOUSE_ROTATE_H, mouse_delta.x / width, 0.0, scene, camera
         )
         _move_camera(
-            model, mujoco.mjtMouse.mjMOUSE_ROTATE_V,
-            0.0, mouse_delta.y / height, scene, camera
+            model, mujoco.mjtMouse.mjMOUSE_ROTATE_V, 0.0, mouse_delta.y / height, scene, camera
         )
     elif imgui.is_key_down(imgui.Key.mouse_right):
         _move_camera(
-            model, mujoco.mjtMouse.mjMOUSE_MOVE_H,
-            -mouse_delta.x / width, 0.0, scene, camera
+            model, mujoco.mjtMouse.mjMOUSE_MOVE_H, mouse_delta.x / width, 0.0, scene, camera
         )
         _move_camera(
-            model, mujoco.mjtMouse.mjMOUSE_MOVE_V,
-            0.0, mouse_delta.y / height, scene, camera
+            model, mujoco.mjtMouse.mjMOUSE_MOVE_V, 0.0, mouse_delta.y / height, scene, camera
         )
     elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
         _move_camera(
-            model, mujoco.mjtMouse.mjMOUSE_ZOOM,
-            0.0, np.sign(mouse_wheel) * 0.05, scene, camera
+            model, mujoco.mjtMouse.mjMOUSE_ZOOM, 0.0, np.sign(mouse_wheel) * 0.05, scene, camera
         )

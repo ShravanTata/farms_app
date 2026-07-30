@@ -118,8 +118,8 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
         imgui.image(
             imgui.ImTextureRef(self.fb.texture_id),
             imgui.ImVec2(avail_w, avail_h),
-            uv0=imgui.ImVec2(1, 1),
-            uv1=imgui.ImVec2(0, 0),
+            uv0=imgui.ImVec2(0, 1),
+            uv1=imgui.ImVec2(1, 0),
         )
         self._viewer_size = imgui.get_item_rect_size()
         self.is_scene_hovered = imgui.is_item_hovered()
@@ -208,11 +208,12 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
     def _screen_to_mujoco(self, mouse_pos):
         """Convert ImGui screen coords to MuJoCo framebuffer coords.
 
-        Accounts for UV flip (uv0=1,1  uv1=0,0) in imgui.image().
+        UV is uv0=(0,1), uv1=(1,0): vertical flip only (OpenGL bottom-origin).
+        X maps directly; Y is inverted.
         """
         rel_x = mouse_pos.x - self._viewer_pos.x
         rel_y = mouse_pos.y - self._viewer_pos.y
-        gl_x = int((1.0 - rel_x / self._viewer_size.x) * self.width)
+        gl_x = int(rel_x / self._viewer_size.x * self.width)
         gl_y = int((1.0 - rel_y / self._viewer_size.y) * self.height)
         return gl_x, gl_y
 
@@ -247,8 +248,7 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
 
     def _perturb_translate(self, mouse_delta):
         """Ctrl + drag: update perturbation reference position."""
-        # Negate deltas to account for UV flip (uv0=1,1 uv1=0,0)
-        dx = -mouse_delta.x / self.width
+        dx = mouse_delta.x / self.width
         dy = mouse_delta.y / self.height
         mujoco.mjv_movePerturb(
             self.model, self.data, mujoco.mjtMouse.mjMOUSE_MOVE_H,
@@ -261,7 +261,7 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
 
     def _perturb_rotate(self, mouse_delta):
         """Ctrl + Shift + drag: update perturbation reference orientation."""
-        dx = -mouse_delta.x / self.width
+        dx = mouse_delta.x / self.width
         dy = mouse_delta.y / self.height
         mujoco.mjv_movePerturb(
             self.model, self.data, mujoco.mjtMouse.mjMOUSE_ROTATE_H,
