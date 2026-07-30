@@ -122,12 +122,12 @@ def mouse_interactions(model, scene, camera, width, height):
 
     if mujoco.mj_version() >= 3011000:
         def _move_camera(model, action, reldx, reldy, scene, camera):
-        mujoco.mjv_moveCamera(
+            mujoco.mjv_moveCamera(
                 model, action, reldx, reldy, camera
-        )
+            )
     else:
         def _move_camera(model, action, reldx, reldy, scene, camera):
-        mujoco.mjv_moveCamera(
+            mujoco.mjv_moveCamera(
                 model, action, reldx, reldy, scene, camera
             )
 
