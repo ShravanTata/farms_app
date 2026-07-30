@@ -120,26 +120,37 @@ def mouse_interactions(model, scene, camera, width, height):
     mouse_delta = io.mouse_delta
     mouse_wheel = io.mouse_wheel
 
-    if imgui.is_key_down(imgui.Key.mouse_left):
+    if mujoco.mj_version() >= 3011000:
+        def _move_camera(model, action, reldx, reldy, scene, camera):
         mujoco.mjv_moveCamera(
-            model, mujoco.mjtMouse.mjMOUSE_ROTATE_H,
-            -mouse_delta.x / width, 0.0, scene, camera,
+                model, action, reldx, reldy, camera
         )
+    else:
+        def _move_camera(model, action, reldx, reldy, scene, camera):
         mujoco.mjv_moveCamera(
+                model, action, reldx, reldy, scene, camera
+            )
+
+    if imgui.is_key_down(imgui.Key.mouse_left):
+        _move_camera(
+            model, mujoco.mjtMouse.mjMOUSE_ROTATE_H,
+            -mouse_delta.x / width, 0.0, scene, camera
+        )
+        _move_camera(
             model, mujoco.mjtMouse.mjMOUSE_ROTATE_V,
-            0.0, mouse_delta.y / height, scene, camera,
+            0.0, mouse_delta.y / height, scene, camera
         )
     elif imgui.is_key_down(imgui.Key.mouse_right):
-        mujoco.mjv_moveCamera(
+        _move_camera(
             model, mujoco.mjtMouse.mjMOUSE_MOVE_H,
-            -mouse_delta.x / width, 0.0, scene, camera,
+            -mouse_delta.x / width, 0.0, scene, camera
         )
-        mujoco.mjv_moveCamera(
+        _move_camera(
             model, mujoco.mjtMouse.mjMOUSE_MOVE_V,
-            0.0, mouse_delta.y / height, scene, camera,
+            0.0, mouse_delta.y / height, scene, camera
         )
     elif imgui.is_key_down(imgui.Key.mouse_wheel_y):
-        mujoco.mjv_moveCamera(
+        _move_camera(
             model, mujoco.mjtMouse.mjMOUSE_ZOOM,
-            0.0, np.sign(mouse_wheel) * 0.05, scene, camera,
+            0.0, np.sign(mouse_wheel) * 0.05, scene, camera
         )
