@@ -57,6 +57,9 @@ class FARMSApplication:
         # Screenshot: path set by menu after pfd dialog, forwarded to backend next frame
         self._screenshot_path: str | None = None
 
+        # Experiment path to load on startup (set by CLI)
+        self.experiment_path: str | None = None
+
         # Input
         self.input_manager: InputManager = InputManager()
 
@@ -168,6 +171,10 @@ class FARMSApplication:
                 if _first:
                     for ext_name in self._options.extension.auto_enable:
                         self.extension_manager.enable(ext_name)
+                    # If experiment path is provided, load it in farmsim extension
+                    if self.experiment_path:
+                        farmsim_ext = self.extension_manager.get("farmsim")
+                        farmsim_ext.load_experiment(self.experiment_path)
                     if on_ready:
                         on_ready(self)
                     _first = False
