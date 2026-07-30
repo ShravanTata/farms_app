@@ -58,9 +58,6 @@ def setup_scene(model, width, height, render_flags=None):
     camera = mujoco.MjvCamera()
     option = mujoco.MjvOption()
     option.flags[mujoco.mjtVisFlag.mjVIS_LIGHT] = True
-    model.vis.headlight.ambient[:] = [0.6] * 3
-    model.vis.headlight.diffuse[:] = [0.4] * 3
-    model.vis.headlight.specular[:] = [0.5] * 3
     perturb = mujoco.MjvPerturb()
     mujoco.mjv_defaultCamera(camera)
     mujoco.mjv_defaultPerturb(perturb)
