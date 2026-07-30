@@ -131,12 +131,10 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
         """Process mouse input for camera and perturbation. Called by the extension."""
         # Handle space key for play/pause toggle
         if imgui.is_key_pressed(imgui.Key.space):
-            ext = self._extension
-            if ext.playback_state == PlaybackState.PLAYING:
-                ext._pause()
+            if self._extension.playback_state == PlaybackState.PLAYING:
+                self._extension._pause()
             else:
-                ext._play()
-            return
+                self._extension._play()
 
         if not self.is_scene_hovered:
             if self.mj_perturb.active != 0:
