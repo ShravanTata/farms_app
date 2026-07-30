@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import mujoco
 import numpy as np
 from farms_app.backends.renderer.gl_framebuffer import MSAAFramebuffer
+from farms_app.core.widget import PlaybackState
 from farms_app.core.window import Window
 from farms_app.utils.mujoco import (
     setup_scene, mouse_interactions, keyboard_interactions,
@@ -128,6 +129,15 @@ class MuJoCoViewportWindow(Window["FARMSIMExtension"]):
 
     def handle_input(self):
         """Process mouse input for camera and perturbation. Called by the extension."""
+        # Handle space key for play/pause toggle
+        if imgui.is_key_pressed(imgui.Key.space):
+            ext = self._extension
+            if ext.playback_state == PlaybackState.PLAYING:
+                ext._pause()
+            else:
+                ext._play()
+            return
+
         if not self.is_scene_hovered:
             if self.mj_perturb.active != 0:
                 self.mj_perturb.active = 0
