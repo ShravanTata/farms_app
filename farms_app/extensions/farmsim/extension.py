@@ -88,6 +88,11 @@ class FARMSIMExtension(Extension):
         self._new_plot_name = ""
         self._show_new_plot_popup = False
 
+    def on_pre_frame(self):
+        """Render MuJoCo before ImGui frame — no FBO conflicts."""
+        if self.sim is not None and self._mujoco_win._initialized:
+            self._mujoco_win.render_mujoco()
+
     def on_enable(self):
         pass
 
