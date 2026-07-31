@@ -67,7 +67,7 @@ status_bar = "farms_app.extensions.ui.status_bar:StatusBarExtension"
 debug = "farms_app.extensions.ui.logger:DebugExtension"
 farmsim = "farms_app.extensions.farmsim.extension:FARMSIMExtension"
 
-# mujoco = "farms_app.extensions.custom.mujoco_impl:MuJoCoExtension"
+mujoco = "farms_app.extensions.custom.mujoco_impl:MuJoCoExtension"
 # experimental = "farms_app.extensions.custom.experimental:ExperimentalExtension"
 # network = "farms_app.extensions.custom.network:NetworkExtension"
 # optimization = "farms_app.extensions.custom.optimization:OptimizationExtension"
