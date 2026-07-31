@@ -117,6 +117,15 @@ class ExtensionManager:
             console.print_exception(show_locals=True)
             return False
 
+    def pre_frame(self):
+        """Called before begin_frame — safe for raw GL rendering (no ImGui FBO)."""
+        for _name, enabled_ext in list(self._enabled_exts.items()):
+            try:
+                enabled_ext.obj.on_pre_frame()
+            except Exception as e:
+                console.print_exception()
+                pylog.error(f"Error in pre_frame for {_name}: {e}")
+
     def tick(self, dt: float):
         """Per-frame dispatch: update -> event -> render for all enabled extensions."""
         ft = self.frame_timer
@@ -286,6 +295,11 @@ class Extension:
     def post_update(self, dt: float):
         """Called after on_update. Fires post_update hooks."""
         self.hooks["post_update"].fire(self, dt)
+
+    def on_pre_frame(self):
+        """Called before begin_frame — safe for raw GL rendering (fpr ex, no ImGui FBO).
+        Use this for offscreen rendering that must not disturb ImGui's state.
+        """
 
     def on_event(self):
         """Called once per frame for input handling."""
